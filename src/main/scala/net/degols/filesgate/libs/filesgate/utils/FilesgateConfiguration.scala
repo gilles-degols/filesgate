@@ -1,20 +1,25 @@
-package net.degols.filesgate.libs.cluster
+package net.degols.filesgate.libs.filesgate.utils
 
 import java.io.File
+import java.util
+import java.util.Map
 
 import com.google.inject.Inject
-import com.typesafe.config.{Config, ConfigFactory}
-import net.degols.filesgate.libs.cluster.Tools.runCommand
+import com.typesafe.config.{Config, ConfigFactory, ConfigValue}
+import net.degols.filesgate.libs.cluster.Tools
 import org.slf4j.LoggerFactory
 
-import collection.JavaConverters._
+import scala.collection.JavaConverters._
 import scala.concurrent.duration._
 import scala.util.Try
+
+case class Step(tpe: String, name: String)
+case class PipelineMetadata(id: String, steps: List[Step], instanceName: String, instances: Option[Int])
 
 /**
   * Created by Gilles.Degols on 03-09-18.
   */
-class ClusterConfiguration @Inject()(val defaultConfig: Config) {
+class FilesgateConfiguration @Inject()(val defaultConfig: Config) {
   private val logger = LoggerFactory.getLogger(getClass)
   /**
     * If the library is loaded directly as a subproject, the Config of the subproject overrides the configuration of the main
@@ -78,6 +83,42 @@ class ClusterConfiguration @Inject()(val defaultConfig: Config) {
 
   val akkaClusterRemoteHostname: String = config.getString("cluster.akka.remote.netty.tcp.hostname")
   val akkaClusterRemotePort: Int = config.getInt("cluster.akka.remote.netty.tcp.port")
+
+  private def toMap(hashMap: AnyRef): Predef.Map[String, AnyRef] = hashMap.asInstanceOf[java.util.Map[String, AnyRef]].asScala.toMap
+  private def toList(list: AnyRef): List[AnyRef] = list.asInstanceOf[java.util.List[AnyRef]].asScala.toList
+
+  /**
+    * How often do we check for the state of PipelineManagers (and start them when needed) in the EngineActor ?
+    */
+  val checkPipelineManagerState: FiniteDuration = config.getInt("filesgate.internal.engine-actor.check-pipeline-manager-state-ms") millis
+
+
+  /**
+    * The various pipelines defined in the configuration
+    */
+  val pipelines: List[PipelineMetadata] = {
+    val set: util.Set[util.Map.Entry[String, ConfigValue]] = config.getConfig("filesgate.pipeline").entrySet()
+    val res = toMap(set) map {
+      case (key, value) =>
+        val id = key
+        val steps = value.asInstanceOf[Config].getObjectList("step-ids").iterator().asScala
+                            .map(rawStep => {
+                              val tpe = rawStep.get("type").asInstanceOf[String]
+                              val name = rawStep.get("name").asInstanceOf[String]
+                              Step(tpe, name)
+                            }).toList
+        val pipelineInstanceName = value.asInstanceOf[Config].getString("pipeline-instance-name")
+        val instances = if ("Core.PipelineInstance" == pipelineInstanceName) {
+         Option(value.asInstanceOf[Config].getInt("default-instances"))
+        } else {
+          None
+        }
+
+        PipelineMetadata(id, steps, pipelineInstanceName, instances)
+    }
+
+    res.toList
+  }
 
   /**
     * Methods to get data from the embedded configuration, or the project configuration (it can override it)

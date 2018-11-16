@@ -1,17 +1,15 @@
-package net.degols.filesgate.libs.filesgate.engine.core
+package net.degols.filesgate.libs.filesgate.core.engine
 
 import javax.inject.{Inject, Singleton}
 
 import akka.actor.ActorContext
-import net.degols.filesgate.engine.cluster.{Cluster, Node, PipelineStep}
-import net.degols.filesgate.service.{ConfigurationService, PipelineMetadata, Tools}
+import net.degols.filesgate.libs.filesgate.core.pipelinemanager.PipelineManager
+import net.degols.filesgate.libs.filesgate.core.{StartPipelineInstances, StopPipelineInstances}
+import net.degols.filesgate.libs.filesgate.utils.FilesgateConfiguration
 import org.slf4j.{Logger, LoggerFactory}
 
-import scala.concurrent.Await
-import scala.util.{Failure, Random, Success, Try}
-
 @Singleton
-class Engine @Inject()(configurationService: ConfigurationService, tools: Tools, cluster: Cluster) {
+class Engine @Inject()(filesgateConfiguration: FilesgateConfiguration) {
   private val logger: Logger = LoggerFactory.getLogger(getClass)
 
   // Set by the EngineActor

@@ -1,4 +1,4 @@
-package net.degols.filesgate.libs.filesgate.engine.core
+package net.degols.filesgate.libs.filesgate.core
 
 import akka.stream.StreamRefMessages.ActorRef
 import net.degols.filesgate.engine.UnknownPipelineStep

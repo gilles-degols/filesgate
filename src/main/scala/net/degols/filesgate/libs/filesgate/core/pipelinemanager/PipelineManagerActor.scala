@@ -1,17 +1,27 @@
-package net.degols.filesgate.libs.filesgate.engine.core
+package net.degols.filesgate.libs.filesgate.core.pipelinemanager
 
 import akka.actor.ActorContext
-import net.degols.filesgate.engine.cluster.{Cluster, PipelineStep}
-import net.degols.filesgate.service.{ConfigurationService, PipelineMetadata, Tools}
+import net.degols.filesgate.libs.cluster.core.Cluster
+import net.degols.filesgate.libs.filesgate.core.{RemotePipelineStep, RemoteStartPipelineStepInstance}
+import net.degols.filesgate.service.Tools
 import org.slf4j.{Logger, LoggerFactory}
 
 import scala.util.{Failure, Success, Try}
 
 /**
-  * Handle everything related to a specific Pipeline
+  * Handle everything related to a specific Pipeline. The related pipeline to handle is given by the EngineActor afterwards.
+  * We can have a lot of those PipelineManager started by default as we are not sure how many are needed by the user. They
+  * will remain idle. Each PipelineManager is in charge of sending jobs to PipelineInstances.
+  * In short:
+  *  -> PipelineManager cannot be customized by the developer. Any PipelineManager can be linked to any pipeline defined by the user
+  *  -> many PipelineManagers to handle all types of pipeline.
+  *  -> one pipelineManager by type of pipeline
+  *  -> each PipelineManager, based on the PipelineMetadata, is linked to a specific set of PipelineInstances (to be able to have a specific load balancer for each of them)
+  *  -> the PipelineInstances are in charge of downloading the files themselves, in a streaming way. So we can have 1000 actors running at the same time in some cases.
+  *  -> Each PipelineInstance will be linked to various actors, to read urls to download, to download them, etc. Sometimes we have 1 actor to read a lot of data, and 10 actors to download, then again 1 actor to write them, all those things linked to one PipelineInstance.
   * @param pipelineMetadata
   */
-class PipelineManager(pipelineMetadata: PipelineMetadata, configurationService: ConfigurationService, tools: Tools, cluster: Cluster) {
+class PipelineManagerActor(pipelineMetadata: PipelineMetadata, configurationService: ConfigurationService, tools: Tools, cluster: Cluster) {
   private val logger: Logger = LoggerFactory.getLogger(getClass)
 
   private var _running: Boolean = false
@@ -84,4 +94,8 @@ class PipelineManager(pipelineMetadata: PipelineMetadata, configurationService: 
       case None => logger.error("We should have a best node available...")
     }
   }
+}
+
+object PipelineManagerActor {
+  val name: String = "Core.PipelineManagerActor"
 }

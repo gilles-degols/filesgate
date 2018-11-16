@@ -1,5 +1,5 @@
 name := "filesgate"
-organization := "net.degols.filesgate.libs"
+organization := "net.degols"
 version := "0.0.1"
 
 scalacOptions ++= Seq("-deprecation", "-feature", "-language:postfixOps")
