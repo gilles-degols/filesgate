@@ -1,7 +1,7 @@
 package net.degols.filesgate.libs.filesgate.core.engine
 
-import akka.actor.Actor
-import net.degols.filesgate.libs.filesgate.core.Start
+import akka.actor.{Actor, Terminated}
+import net.degols.filesgate.libs.filesgate.core.{PipelineManagerWorkingOn, Start}
 import net.degols.filesgate.libs.filesgate.utils.FilesgateConfiguration
 import org.slf4j.LoggerFactory
 
@@ -27,6 +27,12 @@ class EngineActor(engine: Engine, filesgateConfiguration: FilesgateConfiguration
   def running: Receive = {
     case CheckPipelineManagerState =>
       logger.debug("Check status of every PipelineManager.")
+    case x: PipelineManagerWorkingOn =>
+      logger.debug(s"Received ack from the PipelineManager ${sender()} working on ${x.id}")
+      engine.ackFromPipelineManager(sender(), x)
+    case Terminated(actorRef) =>
+      logger.warn(s"An watched actor has just died or has been disconnected: $actorRef")
+      engine
     case x =>
       logger.error(s"Received unknown message in the EngineActor: $x")
   }
