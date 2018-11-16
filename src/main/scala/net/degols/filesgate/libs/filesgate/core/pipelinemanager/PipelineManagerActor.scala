@@ -1,12 +1,16 @@
 package net.degols.filesgate.libs.filesgate.core.pipelinemanager
 
-import akka.actor.ActorContext
+import akka.actor.{Actor, ActorContext, ActorRef, Kill, Terminated}
 import net.degols.filesgate.libs.cluster.core.Cluster
-import net.degols.filesgate.libs.filesgate.core.{RemotePipelineStep, RemoteStartPipelineStepInstance}
+import net.degols.filesgate.libs.filesgate.core.engine.CheckPipelineManagerState
+import net.degols.filesgate.libs.filesgate.core.{PipelineManagerToHandle, PipelineManagerWorkingOn, RemotePipelineStep, RemoteStartPipelineStepInstance}
+import net.degols.filesgate.libs.filesgate.utils.FilesgateConfiguration
 import net.degols.filesgate.service.Tools
 import org.slf4j.{Logger, LoggerFactory}
 
 import scala.util.{Failure, Success, Try}
+
+case object CheckPipelineInstanceState
 
 /**
   * Handle everything related to a specific Pipeline. The related pipeline to handle is given by the EngineActor afterwards.
@@ -19,80 +23,64 @@ import scala.util.{Failure, Success, Try}
   *  -> each PipelineManager, based on the PipelineMetadata, is linked to a specific set of PipelineInstances (to be able to have a specific load balancer for each of them)
   *  -> the PipelineInstances are in charge of downloading the files themselves, in a streaming way. So we can have 1000 actors running at the same time in some cases.
   *  -> Each PipelineInstance will be linked to various actors, to read urls to download, to download them, etc. Sometimes we have 1 actor to read a lot of data, and 10 actors to download, then again 1 actor to write them, all those things linked to one PipelineInstance.
-  * @param pipelineMetadata
   */
-class PipelineManagerActor(pipelineMetadata: PipelineMetadata, configurationService: ConfigurationService, tools: Tools, cluster: Cluster) {
+class PipelineManagerActor(filesgateConfiguration: FilesgateConfiguration) extends Actor {
   private val logger: Logger = LoggerFactory.getLogger(getClass)
 
-  private var _running: Boolean = false
-  def setRunning(running: Boolean): Unit = _running = running
-  def running: Boolean = _running
-
-  // Set by the EngineActor
-  var context: ActorContext = _
-
-  def id: String = pipelineMetadata.id
+  var engineActor: Option[ActorRef] = None
 
   /**
-    * Do we have all the pipeline steps to have a running cluster?
-    * @return
+    * Service to handle everything related to a pipeline.
     */
-  def hasAllPipelineSteps: Boolean = {
-    val existingPipelineSteps: List[PipelineStep] = cluster.nodes.flatMap(node => node.filesGateInstances).flatMap(_.pipelineSteps)
-    pipelineMetadata.stepIds.forall(stepId => existingPipelineSteps.exists(_.id == stepId))
+  val pipelineManager: PipelineManager = new PipelineManager(filesgateConfiguration)
+  pipelineManager.context = context
+
+
+  override def receive: Receive = {
+    case x: PipelineManagerToHandle => // This message is necessary to switch to the running state
+      logger.debug("Received the pipeline id on which we should work on.")
+      pipelineManager.setId(x.id)
+      sender() ! PipelineManagerWorkingOn(x.id)
+
+      val frequency = filesgateConfiguration.checkPipelineInstanceState
+      context.system.scheduler.schedule(frequency, frequency, self, CheckPipelineInstanceState)
+
+      // We watch the EngineActor, if it dies, we should die to
+      engineActor = Option(sender())
+      context.watch(sender())
+
+      context.become(running)
+
+    case x =>
+      logger.error(s"Received unknown message in a PipelineManagerActor: $x")
   }
 
-  /**
-    * Try to start the Engine by asking the creation of the PipelineStepInstances, or to resume them.
-    */
-  def startPipelineInstances(): Try[Unit] = Try{
-    val distribution = cluster.nodesByPipelineStep()
-    distribution.map(nodeAndStep => {
-      val instances = nodeAndStep._1.pipelineStepInstances
-      (nodeAndStep, expectedInstancesForStep(nodeAndStep._1) - instances.size)
-    }).filter(_._2 > 0).foreach(nodeAndStep => {
-      val step = nodeAndStep._1._1
-      val wantedInstances = nodeAndStep._2
-
-      for(i <- 0 to wantedInstances) {
-        startPipelineInstance(step)
+  def running: Receive = {
+    case x: PipelineManagerToHandle =>
+      // We could receive a duplicate message if we are unlucky, but this should normally not happen
+      if(x.id != pipelineManager.id.get) {
+        logger.error(s"We received the order to handle a specific pipeline id (${x.id}), but we already got a different job to do (${pipelineManager.id.get})!")
+      } else {
+        logger.warn(s"We received the order to handle a specific pipeline id (${x.id}), but we are already working on it. We reply just in case the message was lost.")
+        sender() ! PipelineManagerWorkingOn(x.id)
       }
-    })
-  }
 
-  def stopPipelineInstances(): Try[Unit] = Try{
+    case Terminated(actorRef) =>
+      if(actorRef == engineActor.get) {
+        logger.error("The EngineActor just died. We will commit suicide as well.")
+        self ! Kill
+      } else {
+        logger.debug(s"Got a Terminated($actorRef) from a PipelineInstance.")
+        // TODO
+      }
 
-  }
+    case CheckPipelineInstanceState =>
+      logger.debug("Received the order to CheckPipelineInstanceState, verify if we have communicated with all of them")
+      // TODO: Find a way to have a limit of the number of PipelineInstances based on the related Balancer
+      pipelineManager.checkEveryPipelineInstanceStatus(???)
 
-  /**
-    * Expected instances of a given PipelineStepId. For now, we simply ask always the same number from the configuration.
-    * Later on we might want to compute that dynamically based on the queue of every actor.
-    */
-  def expectedInstancesForStep(pipelineStep: PipelineStep): Int = {
-    pipelineMetadata.instancesByStep
-  }
-
-  /**
-    * Start a PipelineInstance, does not care if it's a good idea or not
-    * @param pipelineStep
-    */
-  private def startPipelineInstance(pipelineStep: PipelineStep): Try[Unit] = Try {
-    val bestNode = cluster.bestNodeForStep(pipelineStep)
-    logger.debug(s"Start PipelineStepInstances for ${pipelineStep} on node $bestNode")
-    bestNode match {
-      case Some(node) =>
-        val destActor = node.filesGateInstances.head.actorRef
-        val remotePipelineStep = RemotePipelineStep.from(pipelineStep)
-        Communication.sendWithoutReply(context.self, destActor, RemoteStartPipelineStepInstance(remotePipelineStep)) match {
-          case Success(res) =>
-            // TODO: Verify the returned type...
-            logger.debug("Succeeded to start a PipelineStepInstance.")
-          case Failure(err) =>
-            logger.error("Impossible to start the PipelineInstance...")
-            throw err
-        }
-      case None => logger.error("We should have a best node available...")
-    }
+    case x =>
+      logger.error(s"Received unknown message in a PipelineManagerActor: $x")
   }
 }
 

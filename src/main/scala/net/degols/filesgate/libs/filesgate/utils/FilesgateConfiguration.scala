@@ -92,6 +92,10 @@ class FilesgateConfiguration @Inject()(val defaultConfig: Config) {
     */
   val checkPipelineManagerState: FiniteDuration = config.getInt("filesgate.internal.engine-actor.check-pipeline-manager-state-ms") millis
 
+  /**
+    * How often do we check for the state of PipelineInstances (and start them when needed) in every PipelineManagerActor ?
+    */
+  val checkPipelineInstanceState: FiniteDuration = config.getInt("filesgate.internal.engine-actor.check-pipeline-instance-state-ms") millis
 
   /**
     * The various pipelines defined in the configuration

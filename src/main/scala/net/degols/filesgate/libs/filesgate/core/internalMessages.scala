@@ -40,6 +40,19 @@ case class PipelineManagerToHandle(id: String) extends EngineInternalMessage
 case class PipelineManagerWorkingOn(id: String) extends EngineInternalMessage
 
 /**
+  * Message from the PipelineManagerActor to a PipelineInstanceActor saying for which PipelineManager he should work on.
+  * @param id
+  */
+case class PipelineInstanceToHandle(id: String, pipelineManagerId: String) extends EngineInternalMessage
+
+/**
+  * Reply by a PipelineInstance to the EngineActor saying on which id it is working (based on the PipelineInstanceToHandle
+  * received). It's acting as acknowledgement
+  * @param id
+  */
+case class PipelineInstanceWorkingOn(id: String, pipelineManagerId: String) extends EngineInternalMessage
+
+/**
   * Information sent by a PipelineManager to the EngineActor to give some status about itself
   */
 trait PipelineManagerState
@@ -54,6 +67,20 @@ case class PipelineManagerStatus(id: String, var state: PipelineManagerState) ex
   def actorRef: Option[ActorRef] = actorRef
 
   def isUnreachable: Boolean = state == PipelineManagerUnreachable
+}
+
+trait PipelineInstanceState
+case object PipelineInstanceUnreachable extends PipelineInstanceState
+case object PipelineInstanceWaiting extends PipelineInstanceState
+case object PipelineInstanceRunning extends PipelineInstanceState
+
+case class PipelineInstanceStatus(var pipelineManagerId: Option[String], var state: PipelineInstanceState) extends EngineInternalMessage {
+  private var _actorRef: Option[ActorRef] = None
+  def setActorRef(actorRef: ActorRef): Unit = _actorRef = Option(actorRef)
+  def removeActorRef(): Unit = _actorRef = None
+  def actorRef: Option[ActorRef] = actorRef
+
+  def isUnreachable: Boolean = state == PipelineInstanceUnreachable
 }
 
 /**
