@@ -38,39 +38,7 @@ abstract class EngineLeader @Inject()(engine: Engine,
                                       cluster: Cluster)
   extends WorkerLeader(electionService, configurationService, clusterConfiguration, cluster){
 
-  context.system.scheduler.schedule(10 seconds, 10 seconds, self, "DEBUG")
-
   private val logger = LoggerFactory.getLogger(getClass)
-
-  override def receive: Receive = {
-    case message: CheckPipelineStatus =>
-      logger.info("Check the pipeline status: do we have all steps to start a pipeline / stop it?")
-      engine.checkEveryPipelineStatus()
-
-    case message: StartPipelineInstances =>
-      logger.info("Start the Pipeline: ask for the creation of various PipelineSteps instances.")
-      engine.pipelineManagers.find(_.id == message.pipelineId) match {
-        case Some(res) =>
-          res.startPipelineInstances()
-          res.setRunning(true)
-        case None => // Should never happen
-      }
-
-    case message: StopPipelineInstances =>
-      logger.info("Stop the Pipeline: ask to PipelineSteps to stop processing.")
-      engine.pipelineManagers.find(_.id == message.pipelineId) match {
-        case Some(res) =>
-          res.stopPipelineInstances()
-          res.setRunning(false)
-        case None => // Should never happen
-      }
-
-    case "DEBUG" =>
-      logger.debug(s"[EngineLeader] Cluster topology: \n${cluster}")
-    case message =>
-      logger.debug(s"[EngineLeader] Received unknown message: $message")
-  }
-
 
   /**
     * Start the default actors used internally by filegates. If the name does not exist, call the developer implementation
@@ -84,11 +52,13 @@ abstract class EngineLeader @Inject()(engine: Engine,
         context.actorOf(Props.create(classOf[EngineActor]), name = actorName)
       case PipelineManagerActor.name =>
         context.actorOf(Props.create(classOf[PipelineManagerActor]), name = actorName)
-      case PipelineInstanceActor.name =>
-        context.actorOf(Props.create(classOf[PipelineInstanceActor]), name = actorName)
-      case _ =>
-        logger.debug(s"The $workerTypeId is not known in the EngineLeader of filesgate, this is probably a WorkerType from the user.")
-        startUserWorker(workerTypeId, actorName)
+      case x =>
+        if(x.startsWith(PipelineInstanceActor.prefix)) {
+          context.actorOf(Props.create(classOf[PipelineInstanceActor]), name = actorName)
+        } else {
+          logger.debug(s"The $workerTypeId is not known in the EngineLeader of filesgate, this is probably a WorkerType from the user.")
+          startUserWorker(workerTypeId, actorName)
+        }
     }
   }
 
@@ -96,23 +66,25 @@ abstract class EngineLeader @Inject()(engine: Engine,
     * List of available WorkerActors given by the developer in the current jvm.
     */
   final override def allWorkerTypeInfo: List[WorkerTypeInfo] = {
+    // Set the component values to easily use them
+    EngineLeader.COMPONENT = COMPONENT
+    EngineLeader.PACKAGE = PACKAGE
+
     // One PipelineManager per pipeline defined by the developer
     val totalPipelines = filesgateConfiguration.pipelines.size
 
-    // Unless the developer overrided the PipelineInstance (for example, to give a specific BalancerType), we
-    // need to start the default Core.PipelineInstance in charge of handling files
-    val corePipelineInstances = filesgateConfiguration.pipelines.filter(_.instanceName == PipelineInstanceActor.name).map(_.instances.get).sum
+    // For now we have only one type of PipelineInstance with one balancer as it eases the work a lot. But in the future
+    // we should allow customization
+    val totalPipelineInstances = filesgateConfiguration.pipelines.map(_.instances).sum
+    val defaultWorkers = List(
+      WorkerTypeInfo(self, PipelineInstanceActor.name, BasicLoadBalancerType(instances = totalPipelineInstances, ClusterInstance))
+    )
 
-    val defaultWorkers = if(corePipelineInstances > 0) {
-      List(WorkerTypeInfo(self, PipelineInstanceActor.name, BasicLoadBalancerType(instances = totalPipelines, ClusterInstance)))
-    } else {
-      List.empty[WorkerTypeInfo]
-    }
-
+    // The final list of workers to start
     List(
-      // The Core-EngineActor + Core-PipelineManager can only be handled by Filesgate
+      // The Core-EngineActor + Core-PipelineManager can only be handled by Filesgate, and they are only linked to the current COMPONENT et PACKAGE
       WorkerTypeInfo(self, EngineActor.name, BasicLoadBalancerType(instances = 1, ClusterInstance)),
-      WorkerTypeInfo(self, PipelineManagerActor.name, BasicLoadBalancerType(instances = totalPipelines, ClusterInstance)),
+      WorkerTypeInfo(self, PipelineManagerActor.name, BasicLoadBalancerType(instances = totalPipelines, ClusterInstance))
     ) ++ defaultWorkers ++ allUserWorkerTypeInfo
   }
 
@@ -128,4 +100,10 @@ abstract class EngineLeader @Inject()(engine: Engine,
     * @return
     */
   def allUserWorkerTypeInfo: List[WorkerTypeInfo]
+}
+
+object EngineLeader {
+  // Those values are set by the EngineLeader actor at boot, there is no risk of concurrency problems
+  var COMPONENT: String = _
+  var PACKAGE: String = _
 }

@@ -3,7 +3,7 @@ package net.degols.filesgate.libs.filesgate.core.pipelinemanager
 import akka.actor.{Actor, ActorContext, ActorRef, Kill, Terminated}
 import net.degols.filesgate.libs.cluster.core.Cluster
 import net.degols.filesgate.libs.filesgate.core.engine.CheckPipelineManagerState
-import net.degols.filesgate.libs.filesgate.core.{PipelineManagerToHandle, PipelineManagerWorkingOn, RemotePipelineStep, RemoteStartPipelineStepInstance}
+import net.degols.filesgate.libs.filesgate.core._
 import net.degols.filesgate.libs.filesgate.utils.FilesgateConfiguration
 import net.degols.filesgate.service.Tools
 import org.slf4j.{Logger, LoggerFactory}
@@ -65,19 +65,24 @@ class PipelineManagerActor(filesgateConfiguration: FilesgateConfiguration) exten
         sender() ! PipelineManagerWorkingOn(x.id)
       }
 
+    case x: PipelineInstanceWorkingOn =>
+      logger.debug(s"A PipelineInstance indicated that it is working on ${x.pipelineManagerId}")
+      pipelineManager.ackFromPipelineInstance(sender(), x)
+
     case Terminated(actorRef) =>
       if(actorRef == engineActor.get) {
         logger.error("The EngineActor just died. We will commit suicide as well.")
+        // No need to contact the PipelineInstance, they will commit suicide by themselves
         self ! Kill
       } else {
         logger.debug(s"Got a Terminated($actorRef) from a PipelineInstance.")
-        // TODO
+        pipelineManager.diedActorRef(actorRef)
       }
 
     case CheckPipelineInstanceState =>
       logger.debug("Received the order to CheckPipelineInstanceState, verify if we have communicated with all of them")
-      // TODO: Find a way to have a limit of the number of PipelineInstances based on the related Balancer
-      pipelineManager.checkEveryPipelineInstanceStatus(???)
+      // TODO: Find a way to have a limit of the number of PipelineInstances based on the related Balancer. For now it's written in the configuration for the default Balancer only
+      pipelineManager.checkEveryPipelineInstanceStatus()
 
     case x =>
       logger.error(s"Received unknown message in a PipelineManagerActor: $x")

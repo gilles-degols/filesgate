@@ -7,14 +7,16 @@ import java.util.Map
 import com.google.inject.Inject
 import com.typesafe.config.{Config, ConfigFactory, ConfigValue}
 import net.degols.filesgate.libs.cluster.Tools
+import net.degols.filesgate.libs.cluster.messages.Communication
+import net.degols.filesgate.libs.filesgate.core.EngineLeader
 import org.slf4j.LoggerFactory
 
 import scala.collection.JavaConverters._
 import scala.concurrent.duration._
 import scala.util.Try
 
-case class Step(tpe: String, name: String)
-case class PipelineMetadata(id: String, steps: List[Step], instanceName: String, instances: Option[Int])
+case class Step(tpe: String, name: String, maxInstances: Int)
+case class PipelineMetadata(id: String, steps: List[Step], instances: Int)
 
 /**
   * Created by Gilles.Degols on 03-09-18.
@@ -98,9 +100,10 @@ class FilesgateConfiguration @Inject()(val defaultConfig: Config) {
   val checkPipelineInstanceState: FiniteDuration = config.getInt("filesgate.internal.engine-actor.check-pipeline-instance-state-ms") millis
 
   /**
-    * The various pipelines defined in the configuration
+    * The various pipelines defined in the configuration.
+    * This must remain a lazy val as we don't have the EngineLeader.component / EngineLeader.package at boot
     */
-  val pipelines: List[PipelineMetadata] = {
+  lazy val pipelines: List[PipelineMetadata] = {
     val set: util.Set[util.Map.Entry[String, ConfigValue]] = config.getConfig("filesgate.pipeline").entrySet()
     val res = toMap(set) map {
       case (key, value) =>
@@ -108,17 +111,23 @@ class FilesgateConfiguration @Inject()(val defaultConfig: Config) {
         val steps = value.asInstanceOf[Config].getObjectList("step-ids").iterator().asScala
                             .map(rawStep => {
                               val tpe = rawStep.get("type").asInstanceOf[String]
-                              val name = rawStep.get("name").asInstanceOf[String]
-                              Step(tpe, name)
-                            }).toList
-        val pipelineInstanceName = value.asInstanceOf[Config].getString("pipeline-instance-name")
-        val instances = if ("Core.PipelineInstance" == pipelineInstanceName) {
-         Option(value.asInstanceOf[Config].getInt("default-instances"))
-        } else {
-          None
-        }
+                              val rawName = rawStep.get("name").asInstanceOf[String]
+                              // We might want to add the current Component/Package
+                              val name = if(!rawName.contains(":")) {
+                                if(EngineLeader.COMPONENT == null || EngineLeader.PACKAGE == null) {
+                                  throw new Exception("EngineLeader has not yet its COMPONENT or PACKAGE.")
+                                }
+                                Communication.fullActorName(EngineLeader.COMPONENT, EngineLeader.PACKAGE, rawName)
+                              } else { // We assume we gave a full path directly (maybe to another jvm)
+                                rawName
+                              }
 
-        PipelineMetadata(id, steps, pipelineInstanceName, instances)
+                              val maxInstances = Try{rawStep.get("max-instances").asInstanceOf[Int]}.getOrElse(-1)
+                              Step(tpe, name, maxInstances)
+                            }).toList
+        val instances = value.asInstanceOf[Config].getInt("pipeline-instance.quantity")
+
+        PipelineMetadata(id, steps, instances)
     }
 
     res.toList

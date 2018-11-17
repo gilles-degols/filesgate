@@ -96,6 +96,7 @@ class Engine @Inject()(filesgateConfiguration: FilesgateConfiguration) {
     */
   def freePipelineManagerActors(): List[ActorRef] = {
     val knownActorRefs: Map[ActorRef, Boolean] = pipelineManagers.filter(_.actorRef.isDefined).map(_.actorRef.get -> true).toMap
-    Communication.actorRefsForId(PipelineManagerActor.name).filterNot(knownActorRefs.contains)
+    val fullName = Communication.fullActorName(EngineLeader.COMPONENT, EngineLeader.PACKAGE, PipelineManagerActor.name)
+    Communication.actorRefsForId(fullName).filterNot(knownActorRefs.contains)
   }
 }

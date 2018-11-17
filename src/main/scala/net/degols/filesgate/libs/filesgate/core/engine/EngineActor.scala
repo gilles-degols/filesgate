@@ -32,7 +32,8 @@ class EngineActor(engine: Engine, filesgateConfiguration: FilesgateConfiguration
       engine.ackFromPipelineManager(sender(), x)
     case Terminated(actorRef) =>
       logger.warn(s"An watched actor has just died or has been disconnected: $actorRef")
-      engine
+      engine.diedActorRef(actorRef)
+
     case x =>
       logger.error(s"Received unknown message in the EngineActor: $x")
   }

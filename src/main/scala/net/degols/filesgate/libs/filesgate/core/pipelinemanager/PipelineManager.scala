@@ -5,6 +5,7 @@ import javax.inject.Inject
 import akka.actor.{ActorContext, ActorRef}
 import net.degols.filesgate.libs.cluster.messages.Communication
 import net.degols.filesgate.libs.filesgate.core._
+import net.degols.filesgate.libs.filesgate.core.pipelineinstance.PipelineInstanceActor
 import net.degols.filesgate.libs.filesgate.utils.{FilesgateConfiguration, PipelineMetadata}
 import org.slf4j.{Logger, LoggerFactory}
 
@@ -47,7 +48,7 @@ class PipelineManager @Inject()(filesgateConfiguration: FilesgateConfiguration) 
   /**
     * Check status of every PipelineInstance. From the Communication object we can detect how many PipelineInstance we have,
     * but we cannot use all of them, as other PipelineManagers also want to access a specific amount of PipelineInstance.
-    * As the number of allowed instances can change through time based on the load balancer, we receive it as parameter.
+    * For now, to ease the work, we have a fix amount of PipelineInstances to start from the configuration.
     *
     * If we still don't have any information from the PipelineInstance we try to contact them
     * to give them their id (simple number), their pipeline manager id, and ask them to start working. If we still didn't get an answer since the last attempt, we send a new message.
@@ -57,8 +58,10 @@ class PipelineManager @Inject()(filesgateConfiguration: FilesgateConfiguration) 
     *
     * The PipelineInstances will be in charge of verifying if they have enough worker for them to really start working
     */
-  def checkEveryPipelineInstanceStatus(maxInstances: Int): Unit = {
+  def checkEveryPipelineInstanceStatus(): Unit = {
     // TODO: In very specific case, we might use a bit more PipelineInstances than we should (if we sent the message and before receiving a result we sent the message to another actor)
+    val maxInstances = pipelineMetadata.instances
+
     val missingInstances = maxInstances - pipelineInstances.values.filter(_.pipelineManagerId.isDefined).filter(_.pipelineManagerId.get == id.get).filterNot(_.isUnreachable).size
 
     // We try to detect the available instances based on the Communication system
@@ -116,6 +119,8 @@ class PipelineManager @Inject()(filesgateConfiguration: FilesgateConfiguration) 
         if(status.pipelineManagerId.isDefined && status.pipelineManagerId.get != message.pipelineManagerId) {
           logger.error("We received an ack for an actor ref already assigned to another PipelineManager. This should never happen, system behavior is unknown in this case.")
         } else {
+          // The PipelineInstance can work on another PipelineManager, that's up to another method called frequently to
+          // check if we have enough instances
           status.pipelineManagerId = Option(message.pipelineManagerId)
           status.state = PipelineInstanceWaiting
         }
@@ -127,10 +132,10 @@ class PipelineManager @Inject()(filesgateConfiguration: FilesgateConfiguration) 
     * When a PipelineInstance has died we are notified, in that case we remove it from the known PipelineInstances
     */
   def diedActorRef(actorRef: ActorRef): Unit = {
-    val pipelineInstance = pipelineInstances.values.find(pipelineInstance => pipelineInstance.actorRef.isDefined && pipelineInstance.actorRef.get == actorRef)
+    val pipelineInstance = pipelineInstances.get(actorRef.toString())
 
     pipelineInstance match {
-      case Some(status) => pipelineInstances = pipelineInstances.filterNot(_ == pipelineInstance)
+      case Some(status) => pipelineInstances = pipelineInstances.filterKeys(_ != actorRef.toString())
       case None => logger.error(s"Got a Terminated($actorRef) for an actor ref not linked to a known PipelineInstance...")
     }
   }
@@ -140,7 +145,8 @@ class PipelineManager @Inject()(filesgateConfiguration: FilesgateConfiguration) 
     */
   def freePipelineInstanceActors(): List[ActorRef] = {
     val knownActorRefs: Map[ActorRef, Boolean] = pipelineInstances.values.filter(_.actorRef.isDefined).map(_.actorRef.get -> true).toMap
-    Communication.actorRefsForId(pipelineMetadata.instanceName).filterNot(knownActorRefs.contains)
+    val fullName = Communication.fullActorName(EngineLeader.PACKAGE, EngineLeader.COMPONENT, PipelineInstanceActor.name)
+    Communication.actorRefsForId(fullName).filterNot(knownActorRefs.contains)
   }
 
 }
