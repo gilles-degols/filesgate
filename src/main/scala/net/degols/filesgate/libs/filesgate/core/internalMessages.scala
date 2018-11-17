@@ -47,10 +47,25 @@ case class PipelineInstanceToHandle(id: String, pipelineManagerId: String) exten
 
 /**
   * Reply by a PipelineInstance to the EngineActor saying on which id it is working (based on the PipelineInstanceToHandle
-  * received). It's acting as acknowledgement
+  * received). It's acting as acknowledgement or as notification if the PipelineInstance is already working for another
+  * PipelineManager
   * @param id
   */
 case class PipelineInstanceWorkingOn(id: String, pipelineManagerId: String) extends EngineInternalMessage
+
+
+/**
+  * Demand from a PipelineInstanceActor to know if it agrees to work for a given PipelineInstanceId
+  */
+case class PipelineStepToHandle(id: String, pipelineInstanceId: String, pipelineManagerId: String) extends EngineInternalMessage
+
+/**
+  * Reply by a PipelineStep to the EngineActor saying on which id it is working (based on the PipelineInstanceToHandle
+  * received). A PipelineStep can work for multiple PipelineInstance (and multiple PipelineManagerids as well).
+  * It's acting as acknowledgement or as a refusale to work on the given task (if too much work, or any other reason)
+  * @param id
+  */
+case class PipelineStepWorkingOn(id: String, pipelineInstanceIds: List[String], pipelineManagerIds: List[String]) extends EngineInternalMessage
 
 /**
   * Information sent by a PipelineManager to the EngineActor to give some status about itself
@@ -83,6 +98,31 @@ case class PipelineInstanceStatus(var pipelineManagerId: Option[String], var sta
   def isUnreachable: Boolean = state == PipelineInstanceUnreachable
 }
 
+trait PipelineStepState
+case object PipelineStepUnknown extends PipelineStepState
+case object PipelineStepUnreachable extends PipelineStepState
+case object PipelineStepWaiting extends PipelineStepState
+case object PipelineStepRunning extends PipelineStepState
+
+/**
+  * @param fullName
+  * @param pipelineInstances the key is the PipelineInstanceId
+  */
+case class PipelineStepStatus(fullName: String, var pipelineInstances: Map[String, PipelineStepState]) extends EngineInternalMessage {
+  private var _actorRef: Option[ActorRef] = None
+  def setActorRef(actorRef: ActorRef): Unit = _actorRef = Option(actorRef)
+  def removeActorRef(): Unit = _actorRef = None
+  def actorRef: Option[ActorRef] = actorRef
+
+  def isWorkingFor(pipelineInstanceId: String): Boolean = pipelineInstances.getOrElse(pipelineInstanceId, null) != null
+
+  def isUnreachable(pipelineInstanceId: String): Boolean = {
+    pipelineInstances.get(pipelineInstanceId) match {
+      case Some(st) => st == PipelineStepUnreachable || st == PipelineStepUnknown
+      case None => true
+    }
+  }
+}
 /**
   * Convert remoteMessages to internalMessages
   */

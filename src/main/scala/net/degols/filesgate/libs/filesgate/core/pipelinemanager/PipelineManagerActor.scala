@@ -22,7 +22,7 @@ case object CheckPipelineInstanceState
   *  -> one pipelineManager by type of pipeline
   *  -> each PipelineManager, based on the PipelineMetadata, is linked to a specific set of PipelineInstances (to be able to have a specific load balancer for each of them)
   *  -> the PipelineInstances are in charge of downloading the files themselves, in a streaming way. So we can have 1000 actors running at the same time in some cases.
-  *  -> Each PipelineInstance will be linked to various actors, to read urls to download, to download them, etc. Sometimes we have 1 actor to read a lot of data, and 10 actors to download, then again 1 actor to write them, all those things linked to one PipelineInstance.
+  *  -> Each PipelineInstance will be linked to various actors, to read urls to download, to download them, etc. Sometimes we have 1 actor to read a lot of data, and 10 actors to download, then again 1 actor to write them. Every small worker can be linked to multiple pipeline at the same time.
   */
 class PipelineManagerActor(filesgateConfiguration: FilesgateConfiguration) extends Actor {
   private val logger: Logger = LoggerFactory.getLogger(getClass)

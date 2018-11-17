@@ -31,6 +31,9 @@ class PipelineManager @Inject()(filesgateConfiguration: FilesgateConfiguration) 
   }
   def id: Option[String] = _id
 
+  // Last incremental id for the PipelineInstance that we want to use
+  var pipelineInstanceLastId: Long = 0L
+
   /**
     * Metadata of the current pipeline manager.
     * Must remain a lazy val to be sure that we have the _id. And it should fail if we found no configuration for the pipeline.
@@ -85,8 +88,12 @@ class PipelineManager @Inject()(filesgateConfiguration: FilesgateConfiguration) 
       // The actor ref should always exist based on the code above
       val destActorRef = instanceStatus.actorRef.get
 
+      // Unique id
+      val pipelineInstanceId: String = s"${id.get}-${pipelineInstanceLastId}"
+      pipelineInstanceLastId += 1L
+
       Try {
-        val msg = PipelineInstanceToHandle("some-id", id.get)
+        val msg = PipelineInstanceToHandle(pipelineInstanceId, id.get)
         Communication.sendWithoutReply(context.self, destActorRef, msg)
         // We need to remember to which actor we sent the message, to be sure to not assign the work to anybody else
         instanceStatus.setActorRef(destActorRef)

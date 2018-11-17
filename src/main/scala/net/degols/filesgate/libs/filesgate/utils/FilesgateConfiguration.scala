@@ -15,6 +15,12 @@ import scala.collection.JavaConverters._
 import scala.concurrent.duration._
 import scala.util.Try
 
+/**
+  *
+  * @param tpe
+  * @param name full name to the actor
+  * @param maxInstances
+  */
 case class Step(tpe: String, name: String, maxInstances: Int)
 case class PipelineMetadata(id: String, steps: List[Step], instances: Int)
 
@@ -100,6 +106,11 @@ class FilesgateConfiguration @Inject()(val defaultConfig: Config) {
   val checkPipelineInstanceState: FiniteDuration = config.getInt("filesgate.internal.engine-actor.check-pipeline-instance-state-ms") millis
 
   /**
+    * How often do we check for the state of PipelineSteps (and start them when needed) in every PipelineInstanceActor ?
+    */
+  val checkPipelineStepState: FiniteDuration = config.getInt("filesgate.internal.engine-actor.check-pipeline-instance-step-ms") millis
+
+  /**
     * The various pipelines defined in the configuration.
     * This must remain a lazy val as we don't have the EngineLeader.component / EngineLeader.package at boot
     */
@@ -108,6 +119,7 @@ class FilesgateConfiguration @Inject()(val defaultConfig: Config) {
     val res = toMap(set) map {
       case (key, value) =>
         val id = key
+        // TODO: Add arbitrary steps (download, storage, ...) between the override from the developer
         val steps = value.asInstanceOf[Config].getObjectList("step-ids").iterator().asScala
                             .map(rawStep => {
                               val tpe = rawStep.get("type").asInstanceOf[String]
