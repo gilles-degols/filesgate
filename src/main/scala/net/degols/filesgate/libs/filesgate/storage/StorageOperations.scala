@@ -1,4 +1,4 @@
-package net.degols.filesgate.storage
+package net.degols.filesgate.libs.filesgate.storage
 
 trait StorageResult
 case class SaveOperation() extends StorageResult

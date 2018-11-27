@@ -1,13 +1,12 @@
-package net.degols.filesgate.storage.systems.mongo
+package net.degols.filesgate.libs.filesgate.storage.systems.mongo
 
 import javax.inject.Singleton
-
 import com.google.inject.Inject
-import net.degols.filesgate.orm.{FileContent, FileMetadata}
-import net.degols.filesgate.service.Tools
-import net.degols.filesgate.storage.{StorageContentApi, StorageMetadataApi}
+import net.degols.filesgate.libs.election.ConfigurationService
+import net.degols.filesgate.libs.filesgate.orm.FileMetadata
+import net.degols.filesgate.libs.filesgate.storage.StorageMetadataApi
+import net.degols.filesgate.libs.filesgate.utils.{FilesgateConfiguration, Tools}
 import org.slf4j.{Logger, LoggerFactory}
-import services.ConfigurationService
 
 /**
   * Handle every query linked to the storage of metadata linked to a file.
@@ -15,11 +14,11 @@ import services.ConfigurationService
   * @param conf
   */
 @Singleton
-class MongoMetadata @Inject()(conf: ConfigurationService, tools: Tools) extends StorageMetadataApi {
+class MongoMetadata @Inject()(conf: FilesgateConfiguration, tools: Tools) extends StorageMetadataApi {
   private val logger: Logger = LoggerFactory.getLogger(getClass)
   implicit val executionContext = tools.executionContext
   private val mongoConfiguration = MongoConfiguration(
-    uri = conf.configuration.get[String]("filesgate.storage.metadata.mongo.uri")
+    uri = conf.config.getString("filesgate.storage.metadata.mongo.uri")
   )
 
   /**

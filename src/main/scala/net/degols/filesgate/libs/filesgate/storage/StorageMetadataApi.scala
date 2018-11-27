@@ -1,3 +1,10 @@
+package net.degols.filesgate.libs.filesgate.storage
+
+import net.degols.filesgate.libs.filesgate.orm.FileMetadata
+
+import scala.concurrent.Future
+import scala.util.Try
+
 trait StorageMetadataApi {
   def update(fileMetadata: FileMetadata): Future[Try[UpdateOperation]]
 

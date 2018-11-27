@@ -1,8 +1,7 @@
 package net.degols.filesgate.libs.filesgate.pipeline.prestorage
 
+import net.degols.filesgate.libs.filesgate.orm.{FileMetadata, RawFileContent}
 import net.degols.filesgate.libs.filesgate.pipeline.PipelineStepService
-import net.degols.filesgate.libs.filesgate.pipeline.predownload.{AbortDownload, PreDownloadApi, PreDownloadMessage}
-import net.degols.filesgate.orm.{FileContent, FileMetadata, RawFileContent}
 import org.slf4j.{Logger, LoggerFactory}
 /**
   * @param reason the reason why we aborted the storage

@@ -1,8 +1,6 @@
 package net.degols.filesgate.libs.filesgate.core
 
-import akka.stream.StreamRefMessages.ActorRef
-import net.degols.filesgate.engine.UnknownPipelineStep
-import net.degols.filesgate.engine.cluster.PipelineStep
+import net.degols.filesgate.libs.filesgate.utils.UnknownPipelineStep
 
 /**
   * Every message in this file must be able to go through AkkaRemote, so it must be serializable. To avoid problems, only
@@ -60,11 +58,5 @@ object RemotePipelineStepType {
       case "PostStorageStep" => RemotePostStorageStep()
       case x => throw new UnknownPipelineStep(x)
     }
-  }
-}
-
-object RemotePipelineStep {
-  def from(pipelineStep: PipelineStep): RemotePipelineStep = {
-    new RemotePipelineStep(pipelineStep.id, RemotePipelineStepType.from(pipelineStep.tpe))
   }
 }

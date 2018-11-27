@@ -1,8 +1,7 @@
 package net.degols.filesgate.libs.filesgate.core
 
 import akka.actor.ActorRef
-import net.degols.filesgate.engine.UnknownPipelineStep
-import net.degols.filesgate.engine.cluster.{FilesGateInstance, Node, PipelineStep}
+import net.degols.filesgate.libs.filesgate.utils.UnknownPipelineStep
 import play.api.libs.json.JsResult.Exception
 
 
@@ -79,7 +78,7 @@ case class PipelineManagerStatus(id: String, var state: PipelineManagerState) ex
   private var _actorRef: Option[ActorRef] = None
   def setActorRef(actorRef: ActorRef): Unit = _actorRef = Option(actorRef)
   def removeActorRef(): Unit = _actorRef = None
-  def actorRef: Option[ActorRef] = actorRef
+  def actorRef: Option[ActorRef] = _actorRef
 
   def isUnreachable: Boolean = state == PipelineManagerUnreachable
 }
@@ -93,7 +92,7 @@ case class PipelineInstanceStatus(var pipelineManagerId: Option[String], var sta
   private var _actorRef: Option[ActorRef] = None
   def setActorRef(actorRef: ActorRef): Unit = _actorRef = Option(actorRef)
   def removeActorRef(): Unit = _actorRef = None
-  def actorRef: Option[ActorRef] = actorRef
+  def actorRef: Option[ActorRef] = _actorRef
 
   def isUnreachable: Boolean = state == PipelineInstanceUnreachable
 }
@@ -112,7 +111,7 @@ case class PipelineStepStatus(fullName: String, var pipelineInstances: Map[Strin
   private var _actorRef: Option[ActorRef] = None
   def setActorRef(actorRef: ActorRef): Unit = _actorRef = Option(actorRef)
   def removeActorRef(): Unit = _actorRef = None
-  def actorRef: Option[ActorRef] = actorRef
+  def actorRef: Option[ActorRef] = _actorRef
 
   def isWorkingFor(pipelineInstanceId: String): Boolean = pipelineInstances.getOrElse(pipelineInstanceId, null) != null
 

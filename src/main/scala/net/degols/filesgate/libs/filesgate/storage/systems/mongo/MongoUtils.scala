@@ -1,15 +1,15 @@
-package net.degols.filesgate.storage.systems.mongo
+package net.degols.filesgate.libs.filesgate.storage.systems.mongo
 
 import com.google.inject.Inject
 import com.mongodb.{MongoBulkWriteException, client}
 import com.mongodb.client.model.{CreateCollectionOptions, IndexOptions, InsertManyOptions}
 import com.mongodb.client._
-import net.degols.filesgate.service.Tools
+import net.degols.filesgate.libs.filesgate.utils.{FilesgateConfiguration, Tools}
 import org.bson.Document
 import org.bson.types.ObjectId
 import org.slf4j.{Logger, LoggerFactory}
 import play.api.libs.json.{JsObject, Json}
-import services.ConfigurationService
+
 import scala.collection.JavaConverters._
 
 trait SortType {
@@ -27,7 +27,7 @@ case class SortDesc() extends SortType {
   * @param conf
   * @param tools
   */
-class MongoUtils(conf: ConfigurationService, tools: Tools, mongoConfiguration: MongoConfiguration) {
+class MongoUtils(conf: FilesgateConfiguration, tools: Tools, mongoConfiguration: MongoConfiguration) {
   private val logger: Logger = LoggerFactory.getLogger(getClass)
   implicit val executionContext = tools.executionContext
   private val mongoClient: client.MongoClient = MongoClients.create(mongoConfiguration.uri)

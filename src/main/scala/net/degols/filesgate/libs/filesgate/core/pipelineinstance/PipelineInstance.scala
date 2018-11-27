@@ -94,6 +94,9 @@ class PipelineInstance(filesgateConfiguration: FilesgateConfiguration) {
       launchWork()
     }
 
+    // TODO: We should try to find step in the same node, or even the same jvm if possible, that would reduce the inter-nodes
+    // bandwidth quite a lot, reduce the latency, and increase the availability. But sometimes it's not possible to have that,
+    // so we should have a fallback, and also be ready to tear down a graph, and use other actors if they pop up
     missingSteps.foreach(step => {
       val missingInstances = pipelineSteps.values.filter(_.isWorkingFor(id.get)).filter(_.isUnreachable(id.get))
 
@@ -132,6 +135,11 @@ class PipelineInstance(filesgateConfiguration: FilesgateConfiguration) {
   def launchWork(): Unit = {
 
   }
+
+  /**
+    * Construct
+    */
+
 
   /**
     * When a PipelineStep received its work order, it sent back an acknowledgement. We use it to update the status locally.
@@ -180,7 +188,7 @@ class PipelineInstance(filesgateConfiguration: FilesgateConfiguration) {
     */
   def freePipelineStepActors(pipelineStepFullName: String): List[ActorRef] = {
     val knownActorRefs: Map[ActorRef, Boolean] = pipelineSteps.values.filter(_.actorRef.isDefined).map(_.actorRef.get -> true).toMap
-    Communication.actorRefsForId(pipelineStepFullName).filterNot(knownActorRefs.contains)
+    Communication.actorRefsForId(pipelineStepFullName).filterNot(knownActorRefs.contains(_))
   }
 
 }

@@ -1,10 +1,8 @@
 package net.degols.filesgate.libs.filesgate.pipeline.predownload
 
+import net.degols.filesgate.libs.filesgate.orm.FileMetadata
 import net.degols.filesgate.libs.filesgate.pipeline.PipelineStepService
-import net.degols.filesgate.libs.filesgate.pipeline.poststorage.{PostStorageApi, PostStorageMessage}
-import net.degols.filesgate.orm.{FileContent, FileMetadata}
 import org.slf4j.{Logger, LoggerFactory}
-import play.api.libs.json.JsObject
 
 /**
   * @param reason the reason why we aborted the download

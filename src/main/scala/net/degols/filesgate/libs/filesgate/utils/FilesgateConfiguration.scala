@@ -5,8 +5,8 @@ import java.util
 import java.util.Map
 
 import com.google.inject.Inject
-import com.typesafe.config.{Config, ConfigFactory, ConfigValue}
-import net.degols.filesgate.libs.cluster.Tools
+import com.typesafe.config.{Config, ConfigFactory, ConfigObject, ConfigValue}
+import net.degols.filesgate.libs.cluster.{Tools => ClusterTools}
 import net.degols.filesgate.libs.cluster.messages.Communication
 import net.degols.filesgate.libs.filesgate.core.EngineLeader
 import org.slf4j.LoggerFactory
@@ -59,7 +59,7 @@ class FilesgateConfiguration @Inject()(val defaultConfig: Config) {
     */
   val clusterConfig: Config = config.getConfig("cluster")
 
-  lazy val localHostname: String = Tools.runCommand("hostname")
+  lazy val localHostname: String = ClusterTools.runCommand("hostname")
 
   /**
     * A watcher might not receive any message back from an ElectionActor directly. Or we want to allow a nice switch
@@ -108,22 +108,24 @@ class FilesgateConfiguration @Inject()(val defaultConfig: Config) {
   /**
     * How often do we check for the state of PipelineSteps (and start them when needed) in every PipelineInstanceActor ?
     */
-  val checkPipelineStepState: FiniteDuration = config.getInt("filesgate.internal.engine-actor.check-pipeline-instance-step-ms") millis
+  val checkPipelineStepState: FiniteDuration = config.getInt("filesgate.internal.engine-actor.check-pipeline-step-state-ms") millis
 
   /**
     * The various pipelines defined in the configuration.
     * This must remain a lazy val as we don't have the EngineLeader.component / EngineLeader.package at boot
     */
   lazy val pipelines: List[PipelineMetadata] = {
-    val set: util.Set[util.Map.Entry[String, ConfigValue]] = config.getConfig("filesgate.pipeline").entrySet()
-    val res = toMap(set) map {
+    val set: List[(String, ConfigValue)] = config.getObject("filesgate.pipelines").asScala.toList
+    val res =set map {
       case (key, value) =>
         val id = key
+        val currentPipeline = value.asInstanceOf[ConfigObject].toConfig
+
         // TODO: Add arbitrary steps (download, storage, ...) between the override from the developer
-        val steps = value.asInstanceOf[Config].getObjectList("step-ids").iterator().asScala
+        val steps = currentPipeline.getConfigList("steps").asScala.toList
                             .map(rawStep => {
-                              val tpe = rawStep.get("type").asInstanceOf[String]
-                              val rawName = rawStep.get("name").asInstanceOf[String]
+                              val tpe = rawStep.getString("type")
+                              val rawName = rawStep.getString("name")
                               // We might want to add the current Component/Package
                               val name = if(!rawName.contains(":")) {
                                 if(EngineLeader.COMPONENT == null || EngineLeader.PACKAGE == null) {
@@ -134,10 +136,10 @@ class FilesgateConfiguration @Inject()(val defaultConfig: Config) {
                                 rawName
                               }
 
-                              val maxInstances = Try{rawStep.get("max-instances").asInstanceOf[Int]}.getOrElse(-1)
+                              val maxInstances = Try{rawStep.getInt("max-instances")}.getOrElse(-1)
                               Step(tpe, name, maxInstances)
                             }).toList
-        val instances = value.asInstanceOf[Config].getInt("pipeline-instance.quantity")
+        val instances = currentPipeline.getInt("pipeline-instance.quantity")
 
         PipelineMetadata(id, steps, instances)
     }

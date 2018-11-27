@@ -1,11 +1,11 @@
 package net.degols.filesgate.libs.filesgate.core.pipelinemanager
 
+import scala.concurrent.ExecutionContext.Implicits.global
 import akka.actor.{Actor, ActorContext, ActorRef, Kill, Terminated}
 import net.degols.filesgate.libs.cluster.core.Cluster
 import net.degols.filesgate.libs.filesgate.core.engine.CheckPipelineManagerState
 import net.degols.filesgate.libs.filesgate.core._
 import net.degols.filesgate.libs.filesgate.utils.FilesgateConfiguration
-import net.degols.filesgate.service.Tools
 import org.slf4j.{Logger, LoggerFactory}
 
 import scala.util.{Failure, Success, Try}

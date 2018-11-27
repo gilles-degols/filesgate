@@ -1,5 +1,5 @@
-name := "filesgate"
-organization := "net.degols"
+name := "fgate" // Intellij Idea does not like having a project with a sub-project having the same name
+organization := "net.degols.filesgate.libs"
 version := "0.0.1"
 
 scalacOptions ++= Seq("-deprecation", "-feature", "-language:postfixOps")
@@ -44,6 +44,11 @@ lazy val clusterDependency = if(localClusterAvailable && useLocalClusterLibrary)
 }
 libraryDependencies ++= clusterDependency
 
+// play json
+libraryDependencies += "com.typesafe.play" %% "play-json" % playVersion
 
 // Akka Remoting
 libraryDependencies += "com.typesafe.akka" %% "akka-remote" % akkaVersion
+
+// Akka streaming
+libraryDependencies += "com.typesafe.akka" %% "akka-stream" % akkaVersion

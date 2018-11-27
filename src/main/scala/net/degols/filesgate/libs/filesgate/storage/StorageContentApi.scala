@@ -1,3 +1,10 @@
+package net.degols.filesgate.libs.filesgate.storage
+
+import net.degols.filesgate.libs.filesgate.orm.FileContent
+
+import scala.concurrent.Future
+import scala.util.Try
+
 trait StorageContentApi {
   /**
     * Save a fileContent. Keep in mind that the "fileContent" received can have an incomplete number of chunks

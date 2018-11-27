@@ -1,7 +1,7 @@
 package net.degols.filesgate.libs.filesgate.pipeline
 
 import akka.actor.Actor
-import net.degols.filesgate.engine.core.{BecomeRunning, RemoteStartPipelineStepInstance}
+import net.degols.filesgate.libs.filesgate.core.RemoteStartPipelineStepInstance
 import net.degols.filesgate.libs.filesgate.pipeline.download.{DownloadApi, DownloadMessage}
 import net.degols.filesgate.libs.filesgate.pipeline.poststorage.{PostStorageApi, PostStorageMessage}
 import net.degols.filesgate.libs.filesgate.pipeline.predownload.{PreDownloadApi, PreDownloadMessage}
@@ -13,10 +13,6 @@ import org.slf4j.{Logger, LoggerFactory}
   */
 class PipelineStepActor(pipelineStepService: PipelineStepService) extends Actor {
   private val logger: Logger = LoggerFactory.getLogger(getClass)
-
-  override def preStart(): Unit = {
-    self ! BecomeRunning()
-  }
 
   def running: Receive = {
     case message: PreDownloadMessage =>

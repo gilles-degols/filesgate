@@ -1,7 +1,5 @@
 package net.degols.filesgate.libs.filesgate.core
 
-import java.io.File
-
 import akka.actor.{Actor, ActorRef, Kill, Props}
 import net.degols.filesgate.libs.election.{ConfigurationService, ElectionService, ElectionWrapper}
 import org.slf4j.LoggerFactory
@@ -15,7 +13,7 @@ import net.degols.filesgate.libs.cluster.messages.{BasicLoadBalancerType, Cluste
 import net.degols.filesgate.libs.filesgate.core.engine.{Engine, EngineActor}
 import net.degols.filesgate.libs.filesgate.core.pipelineinstance.{PipelineInstance, PipelineInstanceActor}
 import net.degols.filesgate.libs.filesgate.core.pipelinemanager.{PipelineManager, PipelineManagerActor}
-import net.degols.filesgate.libs.filesgate.utils.{ClusterConfiguration, FilesgateConfiguration}
+import net.degols.filesgate.libs.filesgate.utils.FilesgateConfiguration
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.util.Try
@@ -53,7 +51,7 @@ abstract class EngineLeader @Inject()(engine: Engine,
       case PipelineManagerActor.name =>
         context.actorOf(Props.create(classOf[PipelineManagerActor]), name = actorName)
       case x =>
-        if(x.startsWith(PipelineInstanceActor.prefix)) {
+        if(x == PipelineInstanceActor.name) {
           context.actorOf(Props.create(classOf[PipelineInstanceActor]), name = actorName)
         } else {
           logger.debug(s"The $workerTypeId is not known in the EngineLeader of filesgate, this is probably a WorkerType from the user.")

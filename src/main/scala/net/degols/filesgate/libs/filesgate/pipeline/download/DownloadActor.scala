@@ -1,8 +1,8 @@
 package net.degols.filesgate.libs.filesgate.pipeline.download
 
+import net.degols.filesgate.libs.filesgate.orm.{FileMetadata, RawFileContent}
 import net.degols.filesgate.libs.filesgate.pipeline.PipelineStepService
 import net.degols.filesgate.libs.filesgate.pipeline.prestorage.PreStorageMessage
-import net.degols.filesgate.orm.{FileMetadata, RawFileContent}
 import org.slf4j.{Logger, LoggerFactory}
 
 

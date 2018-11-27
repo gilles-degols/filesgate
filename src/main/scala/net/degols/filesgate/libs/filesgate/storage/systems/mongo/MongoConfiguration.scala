@@ -1,4 +1,4 @@
-package net.degols.filesgate.storage.systems.mongo
+package net.degols.filesgate.libs.filesgate.storage.systems.mongo
 
 /**
   * Configuration for a specific instance of mongodb. We can have two instances of MongoDB: One for the content, another

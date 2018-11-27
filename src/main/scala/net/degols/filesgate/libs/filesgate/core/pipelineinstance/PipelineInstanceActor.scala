@@ -6,6 +6,7 @@ import net.degols.filesgate.libs.filesgate.core.pipelinemanager.{CheckPipelineIn
 import net.degols.filesgate.libs.filesgate.utils.FilesgateConfiguration
 import org.slf4j.{Logger, LoggerFactory}
 
+import scala.concurrent.ExecutionContext.Implicits.global
 
 case object CheckPipelineStepState
 

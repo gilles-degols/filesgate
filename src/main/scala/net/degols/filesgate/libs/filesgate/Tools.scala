@@ -1,4 +1,4 @@
-package net.degols.filesgate.libs.cluster
+package net.degols.filesgate.libs.filesgate
 
 import akka.actor.ActorRef
 import org.joda.time.{DateTime, DateTimeZone}

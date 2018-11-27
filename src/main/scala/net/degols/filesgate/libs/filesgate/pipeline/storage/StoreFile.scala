@@ -1,10 +1,8 @@
 package net.degols.filesgate.libs.filesgate.pipeline.storage
 
+import net.degols.filesgate.libs.filesgate.orm.FileMetadata
 import net.degols.filesgate.libs.filesgate.pipeline.PipelineStepService
-import net.degols.filesgate.libs.filesgate.pipeline.prestorage.{PreStorageApi, PreStorageMessage}
-import net.degols.filesgate.orm.FileMetadata
 import org.slf4j.{Logger, LoggerFactory}
-import play.api.libs.json.JsObject
 
 import scala.util.Try
 

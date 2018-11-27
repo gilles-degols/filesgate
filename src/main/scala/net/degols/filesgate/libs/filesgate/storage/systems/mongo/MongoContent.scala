@@ -1,23 +1,14 @@
-package net.degols.filesgate.storage.systems.mongo
+package net.degols.filesgate.libs.filesgate.storage.systems.mongo
 
 import java.util.concurrent.Executors
+
 import javax.inject.Singleton
-
 import com.google.inject.Inject
-import com.mongodb._
-import com.mongodb.client.model._
-import com.mongodb.client.{MongoClient => _, _}
-import net.degols.filesgate.orm.FileContent
-import net.degols.filesgate.service.Tools
-import net.degols.filesgate.storage.StorageContentApi
-import org.bson.Document
-import org.bson.types.ObjectId
-import org.joda.time.DateTime
+import net.degols.filesgate.libs.filesgate.orm.FileContent
+import net.degols.filesgate.libs.filesgate.storage.StorageContentApi
+import net.degols.filesgate.libs.filesgate.utils.{FilesgateConfiguration, Tools}
 import org.slf4j.{Logger, LoggerFactory}
-import play.api.libs.json.{JsObject, Json}
-import services._
 
-import scala.collection.JavaConverters._
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor}
 
 
@@ -26,11 +17,11 @@ import scala.concurrent.{ExecutionContext, ExecutionContextExecutor}
   * @param conf
   */
 @Singleton
-class MongoContent @Inject()(conf: ConfigurationService, tools: Tools) extends StorageContentApi {
+class MongoContent @Inject()(conf: FilesgateConfiguration, tools: Tools) extends StorageContentApi {
   private val logger: Logger = LoggerFactory.getLogger(getClass)
   implicit val executionContext: ExecutionContextExecutor = tools.executionContext
   private val mongoConfiguration = MongoConfiguration(
-    uri = conf.configuration.get[String]("filesgate.storage.content.mongo.uri")
+    uri = conf.config.getString("filesgate.storage.content.mongo.uri")
   )
 
   /**
