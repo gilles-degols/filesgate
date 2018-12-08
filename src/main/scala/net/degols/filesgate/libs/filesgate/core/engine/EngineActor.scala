@@ -30,6 +30,7 @@ class EngineActor(engine: Engine, filesgateConfiguration: FilesgateConfiguration
   def running: Receive = {
     case CheckPipelineManagerState =>
       logger.debug("Check status of every PipelineManager.")
+      engine.checkEveryPipelineStatus()
     case x: PipelineManagerWorkingOn =>
       logger.debug(s"Received ack from the PipelineManager ${sender()} working on ${x.id}")
       engine.ackFromPipelineManager(sender(), x)

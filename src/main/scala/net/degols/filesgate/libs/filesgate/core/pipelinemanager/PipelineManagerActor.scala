@@ -38,7 +38,7 @@ class PipelineManagerActor(filesgateConfiguration: FilesgateConfiguration) exten
 
   override def receive: Receive = {
     case x: PipelineManagerToHandle => // This message is necessary to switch to the running state
-      logger.debug("Received the pipeline id on which we should work on.")
+      logger.debug(s"Received the pipeline id on which we should work on: ${x.id}.")
       pipelineManager.setId(x.id)
       sender() ! PipelineManagerWorkingOn(x.id)
 
@@ -80,7 +80,7 @@ class PipelineManagerActor(filesgateConfiguration: FilesgateConfiguration) exten
       }
 
     case CheckPipelineInstanceState =>
-      logger.debug("Received the order to CheckPipelineInstanceState, verify if we have communicated with all of them")
+      logger.debug("Received the (local) order to CheckPipelineInstanceState, verify if we have communicated with all of them")
       // TODO: Find a way to have a limit of the number of PipelineInstances based on the related Balancer. For now it's written in the configuration for the default Balancer only
       pipelineManager.checkEveryPipelineInstanceStatus()
 
