@@ -32,7 +32,7 @@ class PipelineInstanceActor(filesgateConfiguration: FilesgateConfiguration) exte
       sender() ! PipelineInstanceWorkingOn(x.id, x.pipelineManagerId)
 
       val frequency = filesgateConfiguration.checkPipelineStepState
-      context.system.scheduler.schedule(frequency, frequency, self, CheckPipelineInstanceState)
+      context.system.scheduler.schedule(frequency, frequency, self, CheckPipelineStepState)
 
       // We watch the PipelineManagerActor, if it dies, we should die to
       pipelineManagerActor = Option(sender())
@@ -76,5 +76,5 @@ class PipelineInstanceActor(filesgateConfiguration: FilesgateConfiguration) exte
 }
 
 object PipelineInstanceActor {
-  val name: String = "Core.PipelineInstanceActor"
+  val NAME: String = "Core.PipelineInstanceActor"
 }

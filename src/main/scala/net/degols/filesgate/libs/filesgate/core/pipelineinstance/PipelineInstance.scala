@@ -188,7 +188,7 @@ class PipelineInstance(filesgateConfiguration: FilesgateConfiguration) {
     */
   def freePipelineStepActors(pipelineStepFullName: String): List[ActorRef] = {
     val knownActorRefs: Map[ActorRef, Boolean] = pipelineSteps.values.filter(_.actorRef.isDefined).map(_.actorRef.get -> true).toMap
-    Communication.actorRefsForId(pipelineStepFullName).filterNot(knownActorRefs.contains(_))
+    Communication.actorRefsForId(pipelineStepFullName).filterNot(knownActorRefs.contains)
   }
 
 }

@@ -38,7 +38,9 @@ class PipelineManager @Inject()(filesgateConfiguration: FilesgateConfiguration) 
     * Metadata of the current pipeline manager.
     * Must remain a lazy val to be sure that we have the _id. And it should fail if we found no configuration for the pipeline.
     */
-  lazy val pipelineMetadata: PipelineMetadata = filesgateConfiguration.pipelines.find(_.id == _id).get
+  lazy val pipelineMetadata: PipelineMetadata = {
+    filesgateConfiguration.pipelines.find(_.id == _id.get).get
+  }
 
   /**
     * Contain the status of every PipelineInstance (are they running or not)
@@ -69,6 +71,7 @@ class PipelineManager @Inject()(filesgateConfiguration: FilesgateConfiguration) 
 
     // We try to detect the available instances based on the Communication system
     val unknownInstances = freePipelineInstanceActors().map(actorRef => {
+      logger.error(s"---> freePipelineInstanceActor: ${actorRef}")
       val p = PipelineInstanceStatus(None, PipelineInstanceUnreachable)
       p.setActorRef(actorRef)
       p
@@ -152,8 +155,8 @@ class PipelineManager @Inject()(filesgateConfiguration: FilesgateConfiguration) 
     */
   def freePipelineInstanceActors(): List[ActorRef] = {
     val knownActorRefs: Map[ActorRef, Boolean] = pipelineInstances.values.filter(_.actorRef.isDefined).map(_.actorRef.get -> true).toMap
-    val fullName = Communication.fullActorName(EngineLeader.PACKAGE, EngineLeader.COMPONENT, PipelineInstanceActor.name)
-    Communication.actorRefsForId(fullName).filterNot(knownActorRefs.contains(_))
+    val fullName = Communication.fullActorName(EngineLeader.COMPONENT, EngineLeader.PACKAGE, PipelineInstanceActor.NAME)
+    Communication.actorRefsForId(fullName).filterNot(knownActorRefs.contains)
   }
 
 }

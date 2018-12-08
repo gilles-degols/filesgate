@@ -50,7 +50,7 @@ abstract class EngineLeader @Inject()(engine: Engine,
         context.actorOf(Props.create(classOf[EngineActor], engine, filesgateConfiguration), name = actorName)
       case PipelineManagerActor.name =>
         context.actorOf(Props.create(classOf[PipelineManagerActor], filesgateConfiguration), name = actorName)
-      case PipelineInstanceActor.name =>
+      case PipelineInstanceActor.NAME =>
         context.actorOf(Props.create(classOf[PipelineInstanceActor], filesgateConfiguration), name = actorName)
       case x =>
         logger.debug(s"The $workerTypeId is not known in the EngineLeader of filesgate, this is probably a WorkerType from the user.")
@@ -73,7 +73,7 @@ abstract class EngineLeader @Inject()(engine: Engine,
     // we should allow customization
     val totalPipelineInstances = filesgateConfiguration.pipelines.map(_.instances).sum
     val defaultWorkers = List(
-      WorkerTypeInfo(self, PipelineInstanceActor.name, BasicLoadBalancerType(instances = totalPipelineInstances, ClusterInstance))
+      WorkerTypeInfo(self, PipelineInstanceActor.NAME, BasicLoadBalancerType(instances = totalPipelineInstances, ClusterInstance))
     )
 
     // The final list of workers to start
