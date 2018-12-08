@@ -14,6 +14,8 @@ case object CheckPipelineManagerState
 class EngineActor(engine: Engine, filesgateConfiguration: FilesgateConfiguration) extends Actor{
   private val logger = LoggerFactory.getLogger(getClass)
 
+  self ! Start()
+
   override def receive: Receive = {
     case x: Start =>
       context.become(running)

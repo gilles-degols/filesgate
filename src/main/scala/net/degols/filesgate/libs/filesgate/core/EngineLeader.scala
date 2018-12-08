@@ -47,16 +47,14 @@ abstract class EngineLeader @Inject()(engine: Engine,
   final override def startWorker(workerTypeId: String, actorName: String): ActorRef = {
     workerTypeId match {
       case EngineActor.name =>
-        context.actorOf(Props.create(classOf[EngineActor]), name = actorName)
+        context.actorOf(Props.create(classOf[EngineActor], engine, filesgateConfiguration), name = actorName)
       case PipelineManagerActor.name =>
-        context.actorOf(Props.create(classOf[PipelineManagerActor]), name = actorName)
+        context.actorOf(Props.create(classOf[PipelineManagerActor], filesgateConfiguration), name = actorName)
+      case PipelineInstanceActor.name =>
+        context.actorOf(Props.create(classOf[PipelineInstanceActor], filesgateConfiguration), name = actorName)
       case x =>
-        if(x == PipelineInstanceActor.name) {
-          context.actorOf(Props.create(classOf[PipelineInstanceActor]), name = actorName)
-        } else {
-          logger.debug(s"The $workerTypeId is not known in the EngineLeader of filesgate, this is probably a WorkerType from the user.")
-          startUserWorker(workerTypeId, actorName)
-        }
+        logger.debug(s"The $workerTypeId is not known in the EngineLeader of filesgate, this is probably a WorkerType from the user.")
+        startUserWorker(workerTypeId, actorName)
     }
   }
 
