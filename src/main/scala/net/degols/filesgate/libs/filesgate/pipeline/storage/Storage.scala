@@ -9,14 +9,14 @@ import scala.util.Try
 
 case class StoreMessage(fileMetadata: FileMetadata)
 
-trait StoreFileApi extends PipelineStepService {
+trait StorageApi extends PipelineStepService {
   def process(storeMessage: StoreMessage): StoreMessage
 
   override def process(message: Any): Any = process(message.asInstanceOf[StoreMessage])
 }
 
-class StoreFile extends StoreFileApi {
-  override def id = "default.storeFile"
+class Storage extends StorageApi {
+  override def id = "default.storage"
   private val logger: Logger = LoggerFactory.getLogger(getClass)
 
   override def process(storeMessage: StoreMessage): StoreMessage = {

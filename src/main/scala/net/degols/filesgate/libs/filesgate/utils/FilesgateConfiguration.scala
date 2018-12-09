@@ -5,7 +5,7 @@ import java.io.File
 import com.google.inject.Inject
 import com.typesafe.config.{Config, ConfigFactory, ConfigObject, ConfigValue}
 import net.degols.filesgate.libs.cluster.{Tools => ClusterTools}
-import net.degols.filesgate.libs.cluster.messages.Communication
+import net.degols.filesgate.libs.cluster.messages.{Communication, LoadBalancerType}
 import net.degols.filesgate.libs.filesgate.core.EngineLeader
 import org.slf4j.LoggerFactory
 import javax.inject.Singleton
@@ -20,8 +20,8 @@ import scala.util.Try
   * @param name full name to the actor
   * @param maxInstances
   */
-case class Step(tpe: String, name: String, maxInstances: Int) {
-  override def toString: String = s"Step($tpe, $name, $maxInstances)"
+case class Step(tpe: String, name: String, loadBalancerType: LoadBalancerType) {
+  override def toString: String = s"Step($tpe, $name, $loadBalancerType)"
 }
 case class PipelineMetadata(id: String, steps: List[Step], instances: Int)
 
@@ -118,30 +118,27 @@ class FilesgateConfiguration @Inject()(val defaultConfig: Config) {
     * This must remain a lazy val as we don't have the EngineLeader.component / EngineLeader.package at boot
     */
   lazy val pipelines: List[PipelineMetadata] = {
+    if(EngineLeader.COMPONENT == null || EngineLeader.PACKAGE == null) {
+      throw new Exception("EngineLeader has not yet its COMPONENT or PACKAGE.")
+    }
+
     val set: List[(String, ConfigValue)] = config.getObject("filesgate.pipelines").asScala.toList
     val res = set map {
       case (key, value) =>
         val id = key
         val currentPipeline = value.asInstanceOf[ConfigObject].toConfig
 
-        // TODO: Add arbitrary steps (download, storage, ...) between the override from the developer
-        val steps = currentPipeline.getConfigList("steps").asScala.toList
+        val steps: List[Step] = currentPipeline.getConfigList("steps").asScala.toList
                             .map(rawStep => {
                               val tpe = rawStep.getString("type")
                               val rawName = rawStep.getString("name")
-                              // We might want to add the current Component/Package
-                              val name = if(!rawName.contains(":")) {
-                                if(EngineLeader.COMPONENT == null || EngineLeader.PACKAGE == null) {
-                                  throw new Exception("EngineLeader has not yet its COMPONENT or PACKAGE.")
-                                }
-                                Communication.fullActorName(EngineLeader.COMPONENT, EngineLeader.PACKAGE, rawName)
-                              } else { // We assume we gave a full path directly (maybe to another jvm)
-                                rawName
-                              }
+                              // We might want to add the current Component/Package & the pipeline id in the step name
+                              val rawNameWithPipeline: String = if(rawName.startsWith(id+".")) rawName else s"$id.$rawName"
+                              val name = Communication.fullActorName(EngineLeader.COMPONENT, EngineLeader.PACKAGE, rawNameWithPipeline)
 
-                              val maxInstances = Try{rawStep.getInt("max-instances")}.getOrElse(-1)
-                              Step(tpe, name, maxInstances)
-                            }).toList
+                              val loadBalancerType: LoadBalancerType = LoadBalancerType.loadFromConfig(rawStep.getConfig("balancer"))
+                              Step(tpe, name, loadBalancerType)
+                            })
 
         // We add missing pipeline steps between the one defined by the user, and order them correctly
         val allSteps = completePipelineSteps(id, steps)

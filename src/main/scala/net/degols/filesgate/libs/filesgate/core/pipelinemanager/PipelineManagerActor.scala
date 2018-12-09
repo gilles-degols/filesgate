@@ -90,5 +90,5 @@ class PipelineManagerActor(filesgateConfiguration: FilesgateConfiguration) exten
 }
 
 object PipelineManagerActor {
-  val name: String = "Core.PipelineManagerActor"
+  val NAME: String = "Core.PipelineManagerActor"
 }

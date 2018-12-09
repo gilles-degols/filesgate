@@ -9,10 +9,11 @@ import scala.concurrent.duration._
 import net.degols.filesgate.libs.cluster.{ClusterConfiguration, Tools}
 import net.degols.filesgate.libs.cluster.core.Cluster
 import net.degols.filesgate.libs.cluster.manager.{Manager, WorkerLeader}
-import net.degols.filesgate.libs.cluster.messages.{BasicLoadBalancerType, ClusterInstance, JVMInstance, WorkerTypeInfo}
+import net.degols.filesgate.libs.cluster.messages._
 import net.degols.filesgate.libs.filesgate.core.engine.{Engine, EngineActor}
 import net.degols.filesgate.libs.filesgate.core.pipelineinstance.{PipelineInstance, PipelineInstanceActor}
 import net.degols.filesgate.libs.filesgate.core.pipelinemanager.{PipelineManager, PipelineManagerActor}
+import net.degols.filesgate.libs.filesgate.pipeline.{PipelineStepActor, PipelineStepService}
 import net.degols.filesgate.libs.filesgate.utils.FilesgateConfiguration
 
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -48,15 +49,29 @@ abstract class EngineLeader @Inject()(engine: Engine,
     workerTypeId match {
       case EngineActor.name =>
         context.actorOf(Props.create(classOf[EngineActor], engine, filesgateConfiguration), name = actorName)
-      case PipelineManagerActor.name =>
+      case PipelineManagerActor.NAME =>
         context.actorOf(Props.create(classOf[PipelineManagerActor], filesgateConfiguration), name = actorName)
       case PipelineInstanceActor.NAME =>
         context.actorOf(Props.create(classOf[PipelineInstanceActor], filesgateConfiguration), name = actorName)
       case x =>
-        logger.debug(s"The $workerTypeId is not known in the EngineLeader of filesgate, this is probably a WorkerType from the user.")
-        startUserWorker(workerTypeId, actorName)
+        // We try to find if the workertypeid is linked to a PipelineStep
+        if(pipelineWorkerTypeInfo.exists(_.workerTypeId == workerTypeId)) {
+          instantiatePipelineStep(workerTypeId, actorName)
+        } else {
+          logger.debug(s"The $workerTypeId is not known in the EngineLeader of filesgate, this is probably a WorkerType from the user.")
+          startUserWorker(workerTypeId, actorName)
+        }
     }
   }
+
+  /**
+    * Instantiate a PipelineInstanceStep with the related class
+    */
+  final def instantiatePipelineStep(workerTypeId: String, actorName: String): ActorRef = {
+    val service: PipelineStepService = startStepService(workerTypeId)
+    context.actorOf(Props.create(classOf[PipelineStepActor], service))
+  }
+
 
   /**
     * List of available WorkerActors given by the developer in the current jvm.
@@ -76,26 +91,44 @@ abstract class EngineLeader @Inject()(engine: Engine,
       WorkerTypeInfo(self, PipelineInstanceActor.NAME, BasicLoadBalancerType(instances = totalPipelineInstances, ClusterInstance))
     )
 
+
     // The final list of workers to start
     List(
       // The Core-EngineActor + Core-PipelineManager can only be handled by Filesgate, and they are only linked to the current COMPONENT et PACKAGE
       WorkerTypeInfo(self, EngineActor.name, BasicLoadBalancerType(instances = 1, ClusterInstance)),
-      WorkerTypeInfo(self, PipelineManagerActor.name, BasicLoadBalancerType(instances = totalPipelines, ClusterInstance))
-    ) ++ defaultWorkers ++ allUserWorkerTypeInfo
+      WorkerTypeInfo(self, PipelineManagerActor.NAME, BasicLoadBalancerType(instances = totalPipelines, ClusterInstance))
+    ) ++ defaultWorkers ++ pipelineWorkerTypeInfo ++ allUserWorkerTypeInfo
   }
 
+  /**
+    * Create the WorkerTypeInfo for the user pipelines and their steps.
+    */
+  final val pipelineWorkerTypeInfo: List[WorkerTypeInfo] = {
+    filesgateConfiguration.pipelines.flatMap(pipelineMetadata => {
+      pipelineMetadata.steps.map(step => {
+        // The step name is formatted that way: "Component:Package:PipelineId.StepName" and we need to remove the two first parts to only have a proper local name
+        val workerTypeId: String = step.name.split(":").drop(2).mkString(":")
+        WorkerTypeInfo(self, workerTypeId, step.loadBalancerType)
+      })
+    })
+  }
 
   /**
-    * To implement by the user
-    * @return
+    * Must be implemented by the developer, for the pipeline step
     */
-  def startUserWorker(workerTypeId: String, actorName: String): ActorRef
+  def startStepService(stepName: String): PipelineStepService
 
   /**
-    * To implement by the user
+    * Can be implemented by the user, not mandatory
     * @return
     */
-  def allUserWorkerTypeInfo: List[WorkerTypeInfo]
+  def startUserWorker(workerTypeId: String, actorName: String): ActorRef = ???
+
+  /**
+    * Can be implemented by the user, not mandatory
+    * @return
+    */
+  def allUserWorkerTypeInfo: List[WorkerTypeInfo] = List.empty[WorkerTypeInfo]
 }
 
 object EngineLeader {
