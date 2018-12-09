@@ -1,8 +1,6 @@
 package net.degols.filesgate.libs.filesgate.utils
 
 import java.io.File
-import java.util
-import java.util.Map
 
 import com.google.inject.Inject
 import com.typesafe.config.{Config, ConfigFactory, ConfigObject, ConfigValue}
@@ -10,6 +8,7 @@ import net.degols.filesgate.libs.cluster.{Tools => ClusterTools}
 import net.degols.filesgate.libs.cluster.messages.Communication
 import net.degols.filesgate.libs.filesgate.core.EngineLeader
 import org.slf4j.LoggerFactory
+import javax.inject.Singleton
 
 import scala.collection.JavaConverters._
 import scala.concurrent.duration._
@@ -21,12 +20,15 @@ import scala.util.Try
   * @param name full name to the actor
   * @param maxInstances
   */
-case class Step(tpe: String, name: String, maxInstances: Int)
+case class Step(tpe: String, name: String, maxInstances: Int) {
+  override def toString: String = s"Step($tpe, $name, $maxInstances)"
+}
 case class PipelineMetadata(id: String, steps: List[Step], instances: Int)
 
 /**
   * Created by Gilles.Degols on 03-09-18.
   */
+@Singleton
 class FilesgateConfiguration @Inject()(val defaultConfig: Config) {
   private val logger = LoggerFactory.getLogger(getClass)
   /**
@@ -51,7 +53,7 @@ class FilesgateConfiguration @Inject()(val defaultConfig: Config) {
       ConfigFactory.load(ConfigFactory.parseFile(fileInProject))
     }
   }
-  val config: Config = defaultConfig.withFallback(projectConfig).withFallback(fallbackConfig)
+  val config: Config = projectConfig.withFallback(defaultConfig).withFallback(fallbackConfig)
 
   /**
     * Configuration for the cluster system. We merge multiple configuration files: One embedded, the other one from the project
@@ -110,13 +112,14 @@ class FilesgateConfiguration @Inject()(val defaultConfig: Config) {
     */
   val checkPipelineStepState: FiniteDuration = config.getInt("filesgate.internal.engine-actor.check-pipeline-step-state-ms") millis
 
+
   /**
     * The various pipelines defined in the configuration.
     * This must remain a lazy val as we don't have the EngineLeader.component / EngineLeader.package at boot
     */
   lazy val pipelines: List[PipelineMetadata] = {
     val set: List[(String, ConfigValue)] = config.getObject("filesgate.pipelines").asScala.toList
-    val res =set map {
+    val res = set map {
       case (key, value) =>
         val id = key
         val currentPipeline = value.asInstanceOf[ConfigObject].toConfig
@@ -139,12 +142,57 @@ class FilesgateConfiguration @Inject()(val defaultConfig: Config) {
                               val maxInstances = Try{rawStep.getInt("max-instances")}.getOrElse(-1)
                               Step(tpe, name, maxInstances)
                             }).toList
+
+        // We add missing pipeline steps between the one defined by the user, and order them correctly
+        val allSteps = completePipelineSteps(id, steps)
+
         val instances = currentPipeline.getInt("pipeline-instance.quantity")
 
-        PipelineMetadata(id, steps, instances)
+        logger.info(s"PipelineStep '$id' ($instances): $allSteps")
+        PipelineMetadata(id, allSteps, instances)
     }
 
-    res.toList
+    res
+  }
+
+  /**
+    * Add missing (mandatory) pipeline steps between the ones defined by the user. If they weren't overrided.
+    * We take care of having the correct order at the end.
+    */
+  private def completePipelineSteps(pipelineId: String, userSteps: List[Step]): List[Step] = {
+    // The default steps that we might have. Only the "source" is mandatory and should be implemented by the developer (unless a mapping is given).
+    // The "download" is a mandatory step, but does not need to be provided by the user.
+    val defaultStepTypes = Map(
+      "source"      -> true, // Mandatory for the developer
+      "matcher"     -> false,
+      "predownload" -> false,
+      "download"    -> true, // Mandatory for the internal working
+      "prestorage"  -> false,
+      "storage"     -> false,
+      "poststorage" -> false
+    )
+
+    // Complete the steps and directly order them correctly
+    val completeSteps: List[Step] = defaultStepTypes.flatMap {
+      case (stepType, mandatory) => {
+        val matchingSteps = userSteps.filter(_.tpe == stepType)
+        if (matchingSteps.size > 1) {
+          logger.error(s"More than one step for ${pipelineId}: ${stepType}. This is not yet supported. Abort.")
+          throw new Exception("Invalid pipeline configuration")
+          None
+        } else if (matchingSteps.nonEmpty) {
+          matchingSteps.headOption
+        } else if(mandatory) {
+          logger.error(s"Missing mandatory step for ${pipelineId}: $stepType. Abort.")
+          throw new Exception("Invalid pipeline configuration")
+          None
+        } else { // Normal behavior, nothing to add
+          None
+        }
+      }
+    }.toList
+
+    completeSteps
   }
 
   /**

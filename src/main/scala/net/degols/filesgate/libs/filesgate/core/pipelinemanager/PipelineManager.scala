@@ -71,7 +71,6 @@ class PipelineManager @Inject()(filesgateConfiguration: FilesgateConfiguration) 
 
     // We try to detect the available instances based on the Communication system
     val unknownInstances = freePipelineInstanceActors().map(actorRef => {
-      logger.error(s"---> freePipelineInstanceActor: ${actorRef}")
       val p = PipelineInstanceStatus(None, PipelineInstanceUnreachable)
       p.setActorRef(actorRef)
       p

@@ -42,7 +42,7 @@ class PipelineInstance(filesgateConfiguration: FilesgateConfiguration) {
     * Metadata of the current pipeline.
     * Must remain a lazy val to be sure that we have the _id. And it should fail if we found no configuration for the pipeline.
     */
-  lazy val pipelineMetadata: PipelineMetadata = filesgateConfiguration.pipelines.find(_.id == _pipelineManagerId).get
+  lazy val pipelineMetadata: PipelineMetadata = filesgateConfiguration.pipelines.find(_.id == _pipelineManagerId.get).get
 
   /**
     * Contain the status of every PipelineStep (are they running or not)
@@ -124,7 +124,7 @@ class PipelineInstance(filesgateConfiguration: FilesgateConfiguration) {
           // the reply to do that
 
         case None =>
-          logger.warn(s"No PipelineStep available for ${id.get}")
+          logger.warn(s"No PipelineStep available for PipelineInstance ${id.get} and the step: ${step.name}")
       }
     })
   }
