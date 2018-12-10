@@ -52,7 +52,7 @@ class PipelineInstanceActor(filesgateConfiguration: FilesgateConfiguration) exte
 
     case x: PipelineStepWorkingOn =>
       // A PipelineStep can decide to not work for a given PipelineManager for multiple reasons (too much work already, etc.)
-      logger.debug(s"A PipelineStep indicated that it is working on ${x.pipelineManagerIds}")
+      logger.debug(s"A PipelineStep indicated that it is working on ${x.pipelineManagerId}")
       pipelineInstance.ackFromPipelineStep(sender(), x)
 
     case Terminated(actorRef) =>

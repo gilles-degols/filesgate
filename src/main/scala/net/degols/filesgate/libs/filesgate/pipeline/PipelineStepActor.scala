@@ -1,7 +1,8 @@
 package net.degols.filesgate.libs.filesgate.pipeline
 
-import akka.actor.Actor
-import net.degols.filesgate.libs.filesgate.core.RemoteStartPipelineStepInstance
+import akka.actor.{Actor, ActorRef}
+import net.degols.filesgate.libs.filesgate.core.pipelineinstance.CheckPipelineStepState
+import net.degols.filesgate.libs.filesgate.core._
 import net.degols.filesgate.libs.filesgate.pipeline.download.{DownloadApi, DownloadMessage}
 import net.degols.filesgate.libs.filesgate.pipeline.poststorage.{PostStorageApi, PostStorageMessage}
 import net.degols.filesgate.libs.filesgate.pipeline.predownload.{PreDownloadApi, PreDownloadMessage}
@@ -14,7 +15,13 @@ import org.slf4j.{Logger, LoggerFactory}
 class PipelineStepActor(pipelineStepService: PipelineStepService) extends Actor {
   private val logger: Logger = LoggerFactory.getLogger(getClass)
 
+  var pipelineInstanceActor: Option[ActorRef] = None
+
   def running: Receive = {
+    case x: PipelineStepToHandle =>
+      // Every PipelineInstance will want that we work for them, but
+      sender() ! PipelineStepWorkingOn(pipelineStepService.id.get, pipelineStepService.pipelineInstanceId.get, pipelineStepService.pipelineManagerId.get)
+
     case message: PreDownloadMessage =>
       if(pipelineStepService.isInstanceOf[PreDownloadApi]) {
         pipelineStepService.process(pipelineStepService)
@@ -48,8 +55,17 @@ class PipelineStepActor(pipelineStepService: PipelineStepService) extends Actor 
   }
 
   override def receive = {
-    case message: RemoteStartPipelineStepInstance =>
-      logger.debug("Received the order to start the current PipelineStepInstance.")
+    case x: PipelineStepToHandle => // This message is necessary to switch to the running state. It is sent by a PipelineInstance
+      logger.debug("Received the pipeline instance id for which we should work on.")
+      pipelineStepService.setId(x.id)
+      pipelineStepService.setPipelineInstanceId(x.pipelineInstanceId)
+      pipelineStepService.setPipelineManagerId(x.pipelineManagerId)
+      sender() ! PipelineStepWorkingOn(x.id, x.pipelineInstanceId, x.pipelineManagerId)
+
+      // We watch the PipelineInstanceActor, if it dies, we should die too
+      pipelineInstanceActor = Option(sender())
+      context.watch(sender())
+
       context.become(running)
 
     case message =>

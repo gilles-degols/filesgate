@@ -60,11 +60,11 @@ case class PipelineStepToHandle(id: String, pipelineInstanceId: String, pipeline
 
 /**
   * Reply by a PipelineStep to the EngineActor saying on which id it is working (based on the PipelineInstanceToHandle
-  * received). A PipelineStep can work for multiple PipelineInstance (and multiple PipelineManagerids as well).
-  * It's acting as acknowledgement or as a refusale to work on the given task (if too much work, or any other reason)
+  * received). A PipelineStep can only work for one PipelineInstance at a time to simplify the code and the (performance) debugging
+  * It's acting as acknowledgement or as a refusal to work on the given task
   * @param id
   */
-case class PipelineStepWorkingOn(id: String, pipelineInstanceIds: List[String], pipelineManagerIds: List[String]) extends EngineInternalMessage
+case class PipelineStepWorkingOn(id: String, pipelineInstanceId: String, pipelineManagerId: String) extends EngineInternalMessage
 
 /**
   * Information sent by a PipelineManager to the EngineActor to give some status about itself
@@ -107,19 +107,14 @@ case object PipelineStepRunning extends PipelineStepState
   * @param fullName
   * @param pipelineInstances the key is the PipelineInstanceId
   */
-case class PipelineStepStatus(fullName: String, var pipelineInstances: Map[String, PipelineStepState]) extends EngineInternalMessage {
+case class PipelineStepStatus(fullName: String, var pipelineInstanceId: String, var pipelineStepState: PipelineStepState = PipelineStepUnknown) extends EngineInternalMessage {
   private var _actorRef: Option[ActorRef] = None
   def setActorRef(actorRef: ActorRef): Unit = _actorRef = Option(actorRef)
   def removeActorRef(): Unit = _actorRef = None
   def actorRef: Option[ActorRef] = _actorRef
 
-  def isWorkingFor(pipelineInstanceId: String): Boolean = pipelineInstances.getOrElse(pipelineInstanceId, null) != null
-
-  def isUnreachable(pipelineInstanceId: String): Boolean = {
-    pipelineInstances.get(pipelineInstanceId) match {
-      case Some(st) => st == PipelineStepUnreachable || st == PipelineStepUnknown
-      case None => true
-    }
+  def isUnreachable: Boolean = {
+    pipelineStepState == PipelineStepUnreachable || pipelineStepState == PipelineStepUnknown
   }
 }
 /**

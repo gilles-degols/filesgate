@@ -103,7 +103,7 @@ abstract class EngineLeader @Inject()(engine: Engine,
   /**
     * Create the WorkerTypeInfo for the user pipelines and their steps.
     */
-  final val pipelineWorkerTypeInfo: List[WorkerTypeInfo] = {
+  final lazy val pipelineWorkerTypeInfo: List[WorkerTypeInfo] = {
     filesgateConfiguration.pipelines.flatMap(pipelineMetadata => {
       pipelineMetadata.steps.map(step => {
         // The step name is formatted that way: "Component:Package:PipelineId.StepName" and we need to remove the two first parts to only have a proper local name

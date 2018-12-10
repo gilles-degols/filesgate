@@ -65,7 +65,7 @@ class PipelineInstance(filesgateConfiguration: FilesgateConfiguration) {
     // We filter by PipelineStep working for the current PipelineInstanceId
     // We need to look for pipeline step having the same "full name" as the one in the given "step" attribute
     pipelineSteps.values.filter(_.fullName == step.name)
-      .map(pipelineStep => (pipelineStep, pipelineStep.pipelineInstances.get(id.get)))
+      .map(pipelineStepStatus => (pipelineStep, pipelineStep.pipelineInstances.get(id.get)))
       .filter(_._2.isDefined)
       .exists(!_._1.isUnreachable(id.get))
   }
@@ -81,8 +81,8 @@ class PipelineInstance(filesgateConfiguration: FilesgateConfiguration) {
     * to give them their id, their pipeline instance id, their pipeline manager id, and ask them to start working.
     * If we still didn't get an answer since the last attempt, we send a new message.
     *
-    * Some PipelineSteps might reply that they are already to busy to work on our tasks (as they are working for PipelineInstances)
-    * so we will receive a message back saying that (=a list of pipeline instance ids they are working, which does not include ours)
+    * Some PipelineSteps might reply that they are already to busy to work for another pipeline (as they are working for PipelineInstances)
+    * so we will receive a message back saying that (=the pipeline instance for which they are working)
     *
     */
   def checkEveryPipelineStepStatus(): Unit = {
@@ -98,7 +98,7 @@ class PipelineInstance(filesgateConfiguration: FilesgateConfiguration) {
     // bandwidth quite a lot, reduce the latency, and increase the availability. But sometimes it's not possible to have that,
     // so we should have a fallback, and also be ready to tear down a graph, and use other actors if they pop up
     missingSteps.foreach(step => {
-      val missingInstances = pipelineSteps.values.filter(_.isWorkingFor(id.get)).filter(_.isUnreachable(id.get))
+      val missingInstances = pipelineSteps.values.filter(_.pipelineInstanceId == id.get).filter(_.isUnreachable)
 
       // For now we only want 1 actor for each step
       val instanceToContact = Random.shuffle(freePipelineStepActors(step.name)).headOption
@@ -136,10 +136,6 @@ class PipelineInstance(filesgateConfiguration: FilesgateConfiguration) {
 
   }
 
-  /**
-    * Construct
-    */
-
 
   /**
     * When a PipelineStep received its work order, it sent back an acknowledgement. We use it to update the status locally.
@@ -151,17 +147,17 @@ class PipelineInstance(filesgateConfiguration: FilesgateConfiguration) {
 
     pipelineStep match {
       case Some(status) =>
-        status.pipelineInstances.get(id.get) match {
-          case Some(st) =>
+        status.pipelineInstanceId match {
+          case id.get =>
             logger.debug(s"The PipelineStep ${message.id} has accepted to work for us ($id).")
-            status.pipelineInstances = message.pipelineInstanceIds.map(pipelineInstanceId => pipelineInstanceId -> PipelineStepUnknown).toMap ++ Map(id.get -> PipelineStepWaiting)
+            status.pipelineStepState = PipelineStepWaiting
             Try{context.watch(sender)} match {
               case Success(res) =>
               case Failure(err) => logger.error(s"Impossible to watch a PipelineStep($sender)")
             }
-          case None =>
+          case otherPipelineInstanceId =>
             logger.debug(s"The PipelineStep ${message.id} has refused to work for us ($id).")
-            status.pipelineInstances = message.pipelineInstanceIds.map(pipelineInstanceId => pipelineInstanceId -> PipelineStepUnknown).toMap
+            status.pipelineStepState = PipelineStepUnknown
             Try{context.watch(sender)} match {
               case Success(res) =>
               case Failure(err) => logger.error(s"Impossible to watch a PipelineStep($sender)")
