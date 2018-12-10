@@ -12,7 +12,7 @@ case class StoreMessage(fileMetadata: FileMetadata)
 trait StorageApi extends PipelineStepService {
   def process(storeMessage: StoreMessage): StoreMessage
 
-  override def process(message: Any): Any = process(message.asInstanceOf[StoreMessage])
+  final override def process(message: Any): Any = process(message.asInstanceOf[StoreMessage])
 }
 
 class Storage extends StorageApi {

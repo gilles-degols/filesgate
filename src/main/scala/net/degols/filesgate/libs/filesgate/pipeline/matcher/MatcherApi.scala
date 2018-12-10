@@ -16,7 +16,7 @@ trait MatcherApi extends PipelineStepService {
     */
   def process(fileMetadata: FileMetadata): Boolean
 
-  override def process(message: Any): Any = process(message.asInstanceOf[FileMetadata])
+  final override def process(message: Any): Any = process(message.asInstanceOf[FileMetadata])
 }
 
 

@@ -27,7 +27,7 @@ trait PostStorageApi extends PipelineStepService {
     */
   def process(postStorageMessage: PostStorageMessage): PostStorageMessage
 
-  override def process(message: Any): Any = process(message.asInstanceOf[PostStorageMessage])
+  final override def process(message: Any): Any = process(message.asInstanceOf[PostStorageMessage])
 }
 
 

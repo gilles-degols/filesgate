@@ -29,7 +29,7 @@ trait PreDownloadApi extends PipelineStepService {
     */
   def process(preDownloadMessage: PreDownloadMessage): PreDownloadMessage
 
-  override def process(message: Any): Any = process(message.asInstanceOf[PreDownloadMessage])
+  final override def process(message: Any): Any = process(message.asInstanceOf[PreDownloadMessage])
 }
 
 class PreDownload extends PreDownloadApi {

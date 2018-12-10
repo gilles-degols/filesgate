@@ -26,7 +26,7 @@ trait PreStorageApi extends PipelineStepService {
     */
   def process(preStorageMessage: PreStorageMessage): PreStorageMessage
 
-  override def process(message: Any): Any = process(message.asInstanceOf[PreStorageMessage])
+  final override def process(message: Any): Any = process(message.asInstanceOf[PreStorageMessage])
 }
 
 class PreStorage extends PreStorageApi {
