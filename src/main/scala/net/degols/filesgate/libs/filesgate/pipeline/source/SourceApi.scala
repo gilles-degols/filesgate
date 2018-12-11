@@ -16,8 +16,11 @@ trait SourceApi extends PipelineStepService {
 }
 
 class Source extends SourceApi {
-  override def id = "default.source"
   private val logger: Logger = LoggerFactory.getLogger(getClass)
 
   override def process(sourceSeed: SourceSeed): Iterator[FileMetadata] = ???
+}
+
+object Source {
+  val TYPE: String = "source"
 }

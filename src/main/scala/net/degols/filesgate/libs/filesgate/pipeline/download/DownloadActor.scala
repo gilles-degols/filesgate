@@ -28,7 +28,6 @@ trait DownloadApi extends PipelineStepService {
 }
 
 class Download extends DownloadApi {
-  override def id = "default.download"
   private val logger: Logger = LoggerFactory.getLogger(getClass)
 
   /**
@@ -40,4 +39,8 @@ class Download extends DownloadApi {
     val rawFileContent = new RawFileContent()
     PreStorageMessage(downloadMessage.fileMetadata, rawFileContent, None)
   }
+}
+
+object Download {
+  val TYPE: String = "download"
 }

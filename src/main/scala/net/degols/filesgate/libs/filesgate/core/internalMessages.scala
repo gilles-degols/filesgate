@@ -55,8 +55,9 @@ case class PipelineInstanceWorkingOn(id: String, pipelineManagerId: String) exte
 
 /**
   * Demand from a PipelineInstanceActor to know if it agrees to work for a given PipelineInstanceId
+  * The Name parameter is the full name of the actor
   */
-case class PipelineStepToHandle(id: String, pipelineInstanceId: String, pipelineManagerId: String) extends EngineInternalMessage
+case class PipelineStepToHandle(id: String, pipelineInstanceId: String, pipelineManagerId: String, name: String) extends EngineInternalMessage
 
 /**
   * Reply by a PipelineStep to the EngineActor saying on which id it is working (based on the PipelineInstanceToHandle
@@ -64,7 +65,7 @@ case class PipelineStepToHandle(id: String, pipelineInstanceId: String, pipeline
   * It's acting as acknowledgement or as a refusal to work on the given task
   * @param id
   */
-case class PipelineStepWorkingOn(id: String, pipelineInstanceId: String, pipelineManagerId: String) extends EngineInternalMessage
+case class PipelineStepWorkingOn(id: String, pipelineInstanceId: String, pipelineManagerId: String, name: String) extends EngineInternalMessage
 
 /**
   * Information sent by a PipelineManager to the EngineActor to give some status about itself

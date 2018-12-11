@@ -1,12 +1,15 @@
 package net.degols.filesgate.libs.filesgate.pipeline
 
 import akka.actor.{Actor, ActorRef}
+import akka.stream.scaladsl.Source
 import net.degols.filesgate.libs.filesgate.core.pipelineinstance.CheckPipelineStepState
 import net.degols.filesgate.libs.filesgate.core._
+import net.degols.filesgate.libs.filesgate.orm.FileMetadata
 import net.degols.filesgate.libs.filesgate.pipeline.download.{DownloadApi, DownloadMessage}
 import net.degols.filesgate.libs.filesgate.pipeline.poststorage.{PostStorageApi, PostStorageMessage}
 import net.degols.filesgate.libs.filesgate.pipeline.predownload.{PreDownloadApi, PreDownloadMessage}
 import net.degols.filesgate.libs.filesgate.pipeline.prestorage.{PreStorageApi, PreStorageMessage}
+import net.degols.filesgate.libs.filesgate.pipeline.source.{SourceApi, SourceSeed}
 import org.slf4j.{Logger, LoggerFactory}
 
 /**
@@ -20,7 +23,17 @@ class PipelineStepActor(pipelineStepService: PipelineStepService) extends Actor 
   def running: Receive = {
     case x: PipelineStepToHandle =>
       // Every PipelineInstance will want that we work for them, but
-      sender() ! PipelineStepWorkingOn(pipelineStepService.id.get, pipelineStepService.pipelineInstanceId.get, pipelineStepService.pipelineManagerId.get)
+      sender() ! PipelineStepWorkingOn(pipelineStepService.id.get, pipelineStepService.pipelineInstanceId.get, pipelineStepService.pipelineManagerId.get, pipelineStepService.name.get)
+
+    case message: SourceSeed =>
+      pipelineStepService match {
+        case sourceApi: SourceApi =>
+          val iter: Iterator[FileMetadata] = sourceApi.process(message)
+          val source = Source.fromIterator(() => iter)
+          sender() ! source
+        case _ =>
+          logger.warn(s"Received a SourceSeed even though we do not have a SourceApi...: ${message}")
+      }
 
     case message: PreDownloadMessage =>
       if(pipelineStepService.isInstanceOf[PreDownloadApi]) {
@@ -60,7 +73,9 @@ class PipelineStepActor(pipelineStepService: PipelineStepService) extends Actor 
       pipelineStepService.setId(x.id)
       pipelineStepService.setPipelineInstanceId(x.pipelineInstanceId)
       pipelineStepService.setPipelineManagerId(x.pipelineManagerId)
-      sender() ! PipelineStepWorkingOn(x.id, x.pipelineInstanceId, x.pipelineManagerId)
+      pipelineStepService.setName(x.name)
+
+      sender() ! PipelineStepWorkingOn(x.id, x.pipelineInstanceId, x.pipelineManagerId, x.name)
 
       // We watch the PipelineInstanceActor, if it dies, we should die too
       pipelineInstanceActor = Option(sender())

@@ -33,11 +33,14 @@ trait PreDownloadApi extends PipelineStepService {
 }
 
 class PreDownload extends PreDownloadApi {
-  override def id = "default.preDownload"
   private val logger: Logger = LoggerFactory.getLogger(getClass)
 
   override def process(preDownloadMessage: PreDownloadMessage): PreDownloadMessage = {
     logger.debug(s"$id: processing $preDownloadMessage")
     preDownloadMessage
   }
+}
+
+object PreDownload {
+  val TYPE: String = "predownload"
 }

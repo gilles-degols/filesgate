@@ -9,6 +9,13 @@ import net.degols.filesgate.libs.cluster.messages.{Communication, LoadBalancerTy
 import net.degols.filesgate.libs.filesgate.core.EngineLeader
 import org.slf4j.LoggerFactory
 import javax.inject.Singleton
+import net.degols.filesgate.libs.filesgate.pipeline.download.Download
+import net.degols.filesgate.libs.filesgate.pipeline.matcher.Matcher
+import net.degols.filesgate.libs.filesgate.pipeline.poststorage.PostStorage
+import net.degols.filesgate.libs.filesgate.pipeline.predownload.PreDownload
+import net.degols.filesgate.libs.filesgate.pipeline.prestorage.PreStorage
+import net.degols.filesgate.libs.filesgate.pipeline.source.Source
+import net.degols.filesgate.libs.filesgate.pipeline.storage.Storage
 
 import scala.collection.JavaConverters._
 import scala.concurrent.duration._
@@ -160,13 +167,13 @@ class FilesgateConfiguration @Inject()(val defaultConfig: Config) {
     // The default steps that we might have. Only the "source" is mandatory and should be implemented by the developer (unless a mapping is given).
     // The "download" is a mandatory step, but does not need to be provided by the user.
     val defaultStepTypes = Map(
-      "source"      -> true, // Mandatory for the developer
-      "matcher"     -> false,
-      "predownload" -> false,
-      "download"    -> true, // Mandatory for the internal working
-      "prestorage"  -> false,
-      "storage"     -> false,
-      "poststorage" -> false
+      Source.TYPE      -> true, // Mandatory for the developer
+      Matcher.TYPE     -> false,
+      PreDownload.TYPE -> false,
+      Download.TYPE    -> true, // Mandatory for the internal working
+      PreStorage.TYPE  -> false,
+      Storage.TYPE     -> false,
+      PostStorage.TYPE -> false
     )
 
     // Complete the steps and directly order them correctly

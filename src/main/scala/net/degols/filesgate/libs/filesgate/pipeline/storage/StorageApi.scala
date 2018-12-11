@@ -16,11 +16,14 @@ trait StorageApi extends PipelineStepService {
 }
 
 class Storage extends StorageApi {
-  override def id = "default.storage"
   private val logger: Logger = LoggerFactory.getLogger(getClass)
 
   override def process(storeMessage: StoreMessage): StoreMessage = {
     logger.debug(s"$id: processing $storeMessage")
     storeMessage
   }
+}
+
+object Storage {
+  val TYPE: String = "storage"
 }

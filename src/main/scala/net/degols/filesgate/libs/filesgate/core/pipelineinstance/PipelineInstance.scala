@@ -3,10 +3,16 @@ package net.degols.filesgate.libs.filesgate.core.pipelineinstance
 import akka.actor.{ActorContext, ActorRef}
 import net.degols.filesgate.libs.cluster.messages.Communication
 import net.degols.filesgate.libs.filesgate.core._
+import net.degols.filesgate.libs.filesgate.pipeline.source.{Source, SourceSeed}
 import net.degols.filesgate.libs.filesgate.utils.{FilesgateConfiguration, PipelineMetadata, Step}
 import org.slf4j.{Logger, LoggerFactory}
 
 import scala.util.{Failure, Random, Success, Try}
+import akka.pattern.ask
+import akka.util.Timeout
+import net.degols.filesgate.libs.filesgate.Tools
+
+import scala.concurrent.duration._
 
 /**
   * Work for only one PipelineInstanceActor linked to only one PipelineManager. Handle multiple PipelineStepActors
@@ -38,6 +44,9 @@ class PipelineInstance(filesgateConfiguration: FilesgateConfiguration) {
   }
   def pipelineManagerId: Option[String] = _pipelineManagerId
 
+  // Temporary
+  var _graphIsRunning: Boolean = false
+
   /**
     * Metadata of the current pipeline.
     * Must remain a lazy val to be sure that we have the _id. And it should fail if we found no configuration for the pipeline.
@@ -64,10 +73,7 @@ class PipelineInstance(filesgateConfiguration: FilesgateConfiguration) {
   def isStepFullFilled(step: Step): Boolean = {
     // We filter by PipelineStep working for the current PipelineInstanceId
     // We need to look for pipeline step having the same "full name" as the one in the given "step" attribute
-    pipelineSteps.values.filter(_.fullName == step.name)
-      .map(pipelineStepStatus => (pipelineStep, pipelineStep.pipelineInstances.get(id.get)))
-      .filter(_._2.isDefined)
-      .exists(!_._1.isUnreachable(id.get))
+    pipelineSteps.values.filter(_.pipelineInstanceId == id.get).filter(_.fullName == step.name).exists(!_.isUnreachable)
   }
 
   /**
@@ -89,8 +95,8 @@ class PipelineInstance(filesgateConfiguration: FilesgateConfiguration) {
     // TODO: In very specific case, we might use a bit more PipelineInstances than we should (if we sent the message and before receiving a result we sent the message to another actor)
     val missingSteps = pipelineMetadata.steps.filterNot(isStepFullFilled)
 
-    if(missingSteps.isEmpty) {
-      logger.info("We have all PipelineSteps necessary to start our PipelineInstance if it is not yet done.")
+    if(missingSteps.isEmpty && !isGraphRunning) {
+      logger.info("We have all PipelineSteps necessary to start our PipelineInstance, we try to create the graph.")
       launchWork()
     }
 
@@ -111,7 +117,7 @@ class PipelineInstance(filesgateConfiguration: FilesgateConfiguration) {
           pipelineStepLastId += 1L
 
           Try {
-            val msg = PipelineStepToHandle(pipelineStepId, id.get, pipelineManagerId.get)
+            val msg = PipelineStepToHandle(pipelineStepId, id.get, pipelineManagerId.get, step.name)
             Communication.sendWithoutReply(context.self, act, msg)
             // We will add the watcher when we receive the reply
           } match {
@@ -130,10 +136,31 @@ class PipelineInstance(filesgateConfiguration: FilesgateConfiguration) {
   }
 
   /**
+    * Check if the graph is already running, in that case there is no need to re-create it
+    */
+  def isGraphRunning: Boolean = _graphIsRunning
+
+  /**
     * In charge of launching the pipeline of actors to work together as a streaming process (if not yet done)
     */
   def launchWork(): Unit = {
+    _graphIsRunning = true
 
+    // Ask for the Source
+    val stepWrappers = stepWrappersFromType(tpe = Source.TYPE)
+    stepWrappers.headOption match { // We only handle one source / pipeline as of now
+      case None =>
+        logger.error(s"Missing source...")
+        throw new Exception(s"Missing source in pipeline ${pipelineManagerId}")
+      case Some(stepWrapper) =>
+        logger.debug("Send a message to get a source")
+        Communication.sendWithReply(context.self, stepWrapper._2.actorRef.get, SourceSeed()) match {
+          case Success(res) =>
+            logger.debug("Got a source", res)
+          case Failure(err) =>
+            logger.error(s"Problem to get the Source: ", err)
+        }
+    }
   }
 
 
@@ -147,25 +174,43 @@ class PipelineInstance(filesgateConfiguration: FilesgateConfiguration) {
 
     pipelineStep match {
       case Some(status) =>
-        status.pipelineInstanceId match {
-          case id.get =>
-            logger.debug(s"The PipelineStep ${message.id} has accepted to work for us ($id).")
-            status.pipelineStepState = PipelineStepWaiting
-            Try{context.watch(sender)} match {
-              case Success(res) =>
-              case Failure(err) => logger.error(s"Impossible to watch a PipelineStep($sender)")
-            }
-          case otherPipelineInstanceId =>
-            logger.debug(s"The PipelineStep ${message.id} has refused to work for us ($id).")
-            status.pipelineStepState = PipelineStepUnknown
-            Try{context.watch(sender)} match {
-              case Success(res) =>
-              case Failure(err) => logger.error(s"Impossible to watch a PipelineStep($sender)")
-            }
+      case None => logger.error(s"Got an acknowledgement from $sender for an actor ref not linked to a known PipelineInstance (${pipelineSteps.keys.mkString(",")})...")
+        if(message.pipelineInstanceId == id.get) {
+          Try {
+            context.watch(sender)
+          } match {
+            case Success(res) =>
+              logger.debug(s"The PipelineStep ${message.id} has accepted to work for us ($id).")
+              val status = PipelineStepStatus(message.name, id.get, PipelineStepWaiting)
+              status.setActorRef(sender)
+              pipelineSteps = pipelineSteps ++ Map(sender.toString() -> status)
+            case Failure(err) => logger.error(s"Impossible to watch a PipelineStep($sender)")
+          }
+        } else {
+          logger.debug(s"The PipelineStep ${message.id} has refused to work for us ($id).")
+          val status = PipelineStepStatus(message.name, id.get, PipelineStepUnknown)
+          pipelineSteps = pipelineSteps ++ Map(sender.toString() -> status)
+          // We do not need to watch it. Rather, when we have a full graph, we should remove all the other entries now useless.
         }
-      case None => logger.error(s"Got an acknowledgement from $sender for an actor ref not linked to a known PipelineInstance...")
     }
   }
+
+  /**
+    * Return the Steps for a given type, and other information (actor ref, ...)
+    */
+  def stepWrappersFromType(tpe: String): List[(Step, PipelineStepStatus)] = {
+    pipelineMetadata.steps.filter(_.tpe == tpe).flatMap(step => {
+      pipelineSteps.find(_._2.fullName == step.name) match {
+        case Some(stat) =>
+          Option((step, stat._2))
+        case None =>
+          // Not all type are necessary, but if we are here, we should have found it in any case
+          logger.error(s"We did not find the pipeline step for a known type ${tpe}")
+          None
+      }
+    })
+  }
+
 
   /**
     * When a PipelineInstance has died we are notified, in that case we remove it from the known PipelineInstances

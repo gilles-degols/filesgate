@@ -21,7 +21,6 @@ trait MatcherApi extends PipelineStepService {
 
 
 class Matcher extends MatcherApi {
-  override def id = "default.matcher"
   private val logger: Logger = LoggerFactory.getLogger(getClass)
 
   /**
@@ -32,4 +31,8 @@ class Matcher extends MatcherApi {
     logger.debug(s"$id: processing $fileMetadata")
     true
   }
+}
+
+object Matcher {
+  val TYPE: String = "matcher"
 }

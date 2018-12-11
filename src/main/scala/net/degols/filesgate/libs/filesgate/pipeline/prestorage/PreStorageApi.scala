@@ -30,11 +30,14 @@ trait PreStorageApi extends PipelineStepService {
 }
 
 class PreStorage extends PreStorageApi {
-  override def id = "default.preStorage"
   private val logger: Logger = LoggerFactory.getLogger(getClass)
 
   override def process(preStorageMessage: PreStorageMessage): PreStorageMessage = {
     logger.debug(s"$id: processing $preStorageMessage")
     preStorageMessage
   }
+}
+
+object PreStorage {
+  val TYPE: String = "prestorage"
 }

@@ -37,6 +37,16 @@ abstract class PipelineStepService {
   }
   def pipelineManagerId: Option[String] = _pipelineManagerId
 
+  private var _name: Option[String] = None
+  private[filesgate] def setName(name: String): Unit = {
+    if(_name.isDefined) {
+      throw new Exception("The name of a PipelineStep cannot be changed once initialized!")
+    } else {
+      _name = Option(name)
+    }
+  }
+  def name: Option[String] = _name
+
 
   /**
     * To be implemented by the user

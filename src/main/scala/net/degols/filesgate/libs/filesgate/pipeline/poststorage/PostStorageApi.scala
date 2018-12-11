@@ -32,11 +32,14 @@ trait PostStorageApi extends PipelineStepService {
 
 
 class PostStorage extends PostStorageApi {
-  override def id = "default.postStorage"
   private val logger: Logger = LoggerFactory.getLogger(getClass)
 
   override def process(postStorageMessage: PostStorageMessage): PostStorageMessage = {
     logger.debug(s"$id: processing $postStorageMessage")
     postStorageMessage
   }
+}
+
+object PostStorage {
+  val TYPE: String = "poststorage"
 }
