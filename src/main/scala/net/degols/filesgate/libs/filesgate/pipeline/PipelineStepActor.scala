@@ -1,5 +1,6 @@
 package net.degols.filesgate.libs.filesgate.pipeline
 
+import akka.NotUsed
 import akka.actor.{Actor, ActorRef}
 import akka.stream.scaladsl.Source
 import net.degols.filesgate.libs.filesgate.core.pipelineinstance.CheckPipelineStepState
@@ -9,7 +10,8 @@ import net.degols.filesgate.libs.filesgate.pipeline.download.{DownloadApi, Downl
 import net.degols.filesgate.libs.filesgate.pipeline.poststorage.{PostStorageApi, PostStorageMessage}
 import net.degols.filesgate.libs.filesgate.pipeline.predownload.{PreDownloadApi, PreDownloadMessage}
 import net.degols.filesgate.libs.filesgate.pipeline.prestorage.{PreStorageApi, PreStorageMessage}
-import net.degols.filesgate.libs.filesgate.pipeline.source.{SourceApi, SourceSeed}
+import net.degols.filesgate.libs.filesgate.pipeline.datasource.{DataSourceApi, DataSourceSeed}
+import net.degols.filesgate.libs.filesgate.pipeline.matcher.MatcherApi
 import org.slf4j.{Logger, LoggerFactory}
 
 /**
@@ -25,14 +27,22 @@ class PipelineStepActor(pipelineStepService: PipelineStepService) extends Actor 
       // Every PipelineInstance will want that we work for them, but
       sender() ! PipelineStepWorkingOn(pipelineStepService.id.get, pipelineStepService.pipelineInstanceId.get, pipelineStepService.pipelineManagerId.get, pipelineStepService.name.get)
 
-    case message: SourceSeed =>
+    case message: DataSourceSeed => // Return the Source directly, not a message
       pipelineStepService match {
-        case sourceApi: SourceApi =>
+        case sourceApi: DataSourceApi =>
           val iter: Iterator[FileMetadata] = sourceApi.process(message)
-          val source = Source.fromIterator(() => iter)
+          val source: Source[FileMetadata, NotUsed] = Source.fromIterator(() => iter)
           sender() ! source
         case _ =>
           logger.warn(s"Received a SourceSeed even though we do not have a SourceApi...: ${message}")
+      }
+
+    case message: FileMetadata =>
+      pipelineStepService match {
+        case matcherApi: MatcherApi => // Simply return true/false
+          sender() ! matcherApi.process(message)
+        case _ =>
+          logger.warn(s"Received a FileMetadata ($message) even though we do not have an appropriate PipelineStep: $pipelineStepService")
       }
 
     case message: PreDownloadMessage =>

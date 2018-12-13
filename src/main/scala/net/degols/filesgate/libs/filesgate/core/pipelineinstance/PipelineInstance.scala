@@ -1,23 +1,26 @@
 package net.degols.filesgate.libs.filesgate.core.pipelineinstance
 
+import akka.NotUsed
 import akka.actor.{ActorContext, ActorRef}
 import net.degols.filesgate.libs.cluster.messages.Communication
 import net.degols.filesgate.libs.filesgate.core._
-import net.degols.filesgate.libs.filesgate.pipeline.source.{Source, SourceSeed}
+import net.degols.filesgate.libs.filesgate.pipeline.datasource.{DataSource, DataSourceSeed}
 import net.degols.filesgate.libs.filesgate.utils.{FilesgateConfiguration, PipelineMetadata, Step}
 import org.slf4j.{Logger, LoggerFactory}
 
 import scala.util.{Failure, Random, Success, Try}
 import akka.pattern.ask
+import akka.stream.scaladsl.Source
 import akka.util.Timeout
 import net.degols.filesgate.libs.filesgate.Tools
+import net.degols.filesgate.libs.filesgate.orm.FileMetadata
 
 import scala.concurrent.duration._
 
 /**
   * Work for only one PipelineInstanceActor linked to only one PipelineManager. Handle multiple PipelineStepActors
   */
-class PipelineInstance(filesgateConfiguration: FilesgateConfiguration) {
+class PipelineInstance(filesgateConfiguration: FilesgateConfiguration, val pipelineGraph: PipelineGraph) {
   private val logger: Logger = LoggerFactory.getLogger(getClass)
 
   // Set by the PipelineInstanceActor when it is started
@@ -146,22 +149,9 @@ class PipelineInstance(filesgateConfiguration: FilesgateConfiguration) {
   def launchWork(): Unit = {
     _graphIsRunning = true
 
-    // Ask for the Source
-    val stepWrappers = stepWrappersFromType(tpe = Source.TYPE)
-    stepWrappers.headOption match { // We only handle one source / pipeline as of now
-      case None =>
-        logger.error(s"Missing source...")
-        throw new Exception(s"Missing source in pipeline ${pipelineManagerId}")
-      case Some(stepWrapper) =>
-        logger.debug("Send a message to get a source")
-        Communication.sendWithReply(context.self, stepWrapper._2.actorRef.get, SourceSeed()) match {
-          case Success(res) =>
-            logger.debug("Got a source", res)
-          case Failure(err) =>
-            logger.error(s"Problem to get the Source: ", err)
-        }
-    }
+    pipelineGraph.loadGraph(pipelineMetadata, pipelineSteps)
   }
+
 
 
   /**
@@ -194,23 +184,6 @@ class PipelineInstance(filesgateConfiguration: FilesgateConfiguration) {
         }
     }
   }
-
-  /**
-    * Return the Steps for a given type, and other information (actor ref, ...)
-    */
-  def stepWrappersFromType(tpe: String): List[(Step, PipelineStepStatus)] = {
-    pipelineMetadata.steps.filter(_.tpe == tpe).flatMap(step => {
-      pipelineSteps.find(_._2.fullName == step.name) match {
-        case Some(stat) =>
-          Option((step, stat._2))
-        case None =>
-          // Not all type are necessary, but if we are here, we should have found it in any case
-          logger.error(s"We did not find the pipeline step for a known type ${tpe}")
-          None
-      }
-    })
-  }
-
 
   /**
     * When a PipelineInstance has died we are notified, in that case we remove it from the known PipelineInstances

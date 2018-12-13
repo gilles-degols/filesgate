@@ -21,8 +21,10 @@ class PipelineInstanceActor(filesgateConfiguration: FilesgateConfiguration) exte
   /**
     * Service to handle everything related to a pipeline.
     */
-  val pipelineInstance: PipelineInstance = new PipelineInstance(filesgateConfiguration)
+  val pipelineGraph: PipelineGraph = new PipelineGraph(filesgateConfiguration)
+  val pipelineInstance: PipelineInstance = new PipelineInstance(filesgateConfiguration, pipelineGraph)
   pipelineInstance.context = context
+  pipelineInstance.pipelineGraph.context = context
 
   override def receive: Receive = {
     case x: PipelineInstanceToHandle => // This message is necessary to switch to the running state. It is sent by a PipelineManager
