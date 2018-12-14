@@ -7,6 +7,7 @@ import org.slf4j.{Logger, LoggerFactory}
 /**
   * @param reason the reason why we aborted the post-storage scripts
   */
+@SerialVersionUID(0L)
 case class AbortPostStorage(reason: String)
 
 /**
@@ -15,6 +16,7 @@ case class AbortPostStorage(reason: String)
   * @param rawFileContent
   * @param abortPostStorage if this value is received, we do not go any next post-storage stage
   */
+@SerialVersionUID(0L)
 case class PostStorageMessage(fileMetadata: FileMetadata, rawFileContent: RawFileContent, abortPostStorage: Option[AbortPostStorage])
 
 /**

@@ -10,6 +10,7 @@ import org.slf4j.{Logger, LoggerFactory}
   *                          x seconds. The message won't go to any next pre-processing step. If the value is negative,
   *                          we will never re-schedule it.
   */
+@SerialVersionUID(0L)
 case class AbortDownload(reason: String, rescheduleSeconds: Option[Long])
 
 /**
@@ -17,6 +18,7 @@ case class AbortDownload(reason: String, rescheduleSeconds: Option[Long])
   * @param fileMetadata
   * @param abortDownload if this value is received, we do not go any next pre-download stage
   */
+@SerialVersionUID(0L)
 case class PreDownloadMessage(fileMetadata: FileMetadata, abortDownload: Option[AbortDownload])
 
 /**

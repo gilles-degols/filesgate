@@ -10,6 +10,7 @@ import org.slf4j.{Logger, LoggerFactory}
   * Message sent through every PreDownloadApi before the actual download of a file
   * @param fileMetadata
   */
+@SerialVersionUID(0L)
 case class DownloadMessage(fileMetadata: FileMetadata)
 
 /**

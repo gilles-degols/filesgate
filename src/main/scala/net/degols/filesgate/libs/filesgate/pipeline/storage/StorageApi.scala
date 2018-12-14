@@ -6,7 +6,7 @@ import org.slf4j.{Logger, LoggerFactory}
 
 import scala.util.Try
 
-
+@SerialVersionUID(0L)
 case class StoreMessage(fileMetadata: FileMetadata)
 
 trait StorageApi extends PipelineStepService {

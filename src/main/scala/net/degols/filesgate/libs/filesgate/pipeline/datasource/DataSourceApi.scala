@@ -7,6 +7,7 @@ import org.slf4j.{Logger, LoggerFactory}
 /**
   * There is not always a seed for the source, but having this message simplify the setup
   */
+@SerialVersionUID(0L)
 case class DataSourceSeed()
 
 trait DataSourceApi extends PipelineStepService {

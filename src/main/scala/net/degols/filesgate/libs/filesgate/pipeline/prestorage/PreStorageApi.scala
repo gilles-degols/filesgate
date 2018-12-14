@@ -6,6 +6,7 @@ import org.slf4j.{Logger, LoggerFactory}
 /**
   * @param reason the reason why we aborted the storage
   */
+@SerialVersionUID(0L)
 case class AbortStorage(reason: String)
 
 /**
@@ -14,6 +15,7 @@ case class AbortStorage(reason: String)
   * @param rawFileContent
   * @param abortStorage if this value is received, we do not go any next pre-storage stage
   */
+@SerialVersionUID(0L)
 case class PreStorageMessage(fileMetadata: FileMetadata, rawFileContent: RawFileContent, abortStorage: Option[AbortStorage])
 
 /**

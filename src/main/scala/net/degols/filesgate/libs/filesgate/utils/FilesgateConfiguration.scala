@@ -160,24 +160,30 @@ class FilesgateConfiguration @Inject()(val defaultConfig: Config) {
   }
 
   /**
+    * Return a list of the different pipeline stages
+    * As value, we have a boolean saying if the related step is mandatory
+    *
+    * Only the "source" is mandatory and should be implemented by the developer (unless a mapping is given).
+    * The "download" is a mandatory step, but does not need to be provided by the user.
+    */
+  val PIPELINE_STEP_TYPES: Map[String, Boolean] = Map(
+    DataSource.TYPE      -> true, // Mandatory for the developer
+    Matcher.TYPE     -> false,
+    PreDownload.TYPE -> false,
+    Download.TYPE    -> true, // Mandatory for the internal working
+    PreStorage.TYPE  -> false,
+    Storage.TYPE     -> false,
+    PostStorage.TYPE -> false
+  )
+
+  /**
     * Add missing (mandatory) pipeline steps between the ones defined by the user. If they weren't overrided.
     * We take care of having the correct order at the end.
     */
   private def completePipelineSteps(pipelineId: String, userSteps: List[Step]): List[Step] = {
-    // The default steps that we might have. Only the "source" is mandatory and should be implemented by the developer (unless a mapping is given).
-    // The "download" is a mandatory step, but does not need to be provided by the user.
-    val defaultStepTypes = Map(
-      DataSource.TYPE      -> true, // Mandatory for the developer
-      Matcher.TYPE     -> false,
-      PreDownload.TYPE -> false,
-      Download.TYPE    -> true, // Mandatory for the internal working
-      PreStorage.TYPE  -> false,
-      Storage.TYPE     -> false,
-      PostStorage.TYPE -> false
-    )
 
     // Complete the steps and directly order them correctly
-    val completeSteps: List[Step] = defaultStepTypes.flatMap {
+    val completeSteps: List[Step] = PIPELINE_STEP_TYPES.flatMap {
       case (stepType, mandatory) => {
         val matchingSteps = userSteps.filter(_.tpe == stepType)
         if (matchingSteps.size > 1) {
