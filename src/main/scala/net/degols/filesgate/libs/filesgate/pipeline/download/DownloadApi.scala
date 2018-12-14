@@ -1,9 +1,12 @@
 package net.degols.filesgate.libs.filesgate.pipeline.download
 
 import net.degols.filesgate.libs.filesgate.orm.{FileMetadata, RawFileContent}
-import net.degols.filesgate.libs.filesgate.pipeline.PipelineStepService
+import net.degols.filesgate.libs.filesgate.pipeline.matcher.MatcherMessage
+import net.degols.filesgate.libs.filesgate.pipeline.predownload.PreDownloadMessage
+import net.degols.filesgate.libs.filesgate.pipeline.{AbortStep, PipelineStep, PipelineStepMessage, PipelineStepService}
 import net.degols.filesgate.libs.filesgate.pipeline.prestorage.PreStorageMessage
 import org.slf4j.{Logger, LoggerFactory}
+import play.api.libs.json.JsObject
 
 
 /**
@@ -11,7 +14,11 @@ import org.slf4j.{Logger, LoggerFactory}
   * @param fileMetadata
   */
 @SerialVersionUID(0L)
-case class DownloadMessage(fileMetadata: FileMetadata)
+case class DownloadMessage(override val fileMetadata: FileMetadata, override val abort: Option[AbortStep], rawFileContent: Option[RawFileContent], downloadMetadata: Option[JsObject]) extends PipelineStepMessage(fileMetadata, abort)
+
+object DownloadMessage {
+  def from(preDownloadMessage: PreDownloadMessage): DownloadMessage = DownloadMessage(preDownloadMessage.fileMetadata, preDownloadMessage.abort, None, None)
+}
 
 /**
   * By default there will be only one Download step available, but this can be extended afterwards.
@@ -23,7 +30,7 @@ trait DownloadApi extends PipelineStepService {
     * @param downloadMessage
     * @return
     */
-  def process(downloadMessage: DownloadMessage): PreStorageMessage
+  def process(downloadMessage: DownloadMessage): DownloadMessage
 
   final override def process(message: Any): Any = process(message.asInstanceOf[DownloadMessage])
 }
@@ -35,13 +42,13 @@ class Download extends DownloadApi {
     * @param downloadMessage
     * @return
     */
-  override def process(downloadMessage: DownloadMessage): PreStorageMessage = {
+  override def process(downloadMessage: DownloadMessage): DownloadMessage = {
     logger.debug(s"$id: processing $downloadMessage")
-    val rawFileContent = new RawFileContent()
-    PreStorageMessage(downloadMessage.fileMetadata, rawFileContent, None)
+    downloadMessage
   }
 }
 
-object Download {
-  val TYPE: String = "download"
+object Download extends PipelineStep{
+  override val TYPE: String = "download"
+  override val MANDATORY: Boolean = true
 }

@@ -1,14 +1,11 @@
 package net.degols.filesgate.libs.filesgate.pipeline.poststorage
 
 import net.degols.filesgate.libs.filesgate.orm.{FileMetadata, RawFileContent}
-import net.degols.filesgate.libs.filesgate.pipeline.PipelineStepService
+import net.degols.filesgate.libs.filesgate.pipeline.prestorage.PreStorageMessage
+import net.degols.filesgate.libs.filesgate.pipeline.storage.StorageMessage
+import net.degols.filesgate.libs.filesgate.pipeline.{AbortStep, PipelineStep, PipelineStepMessage, PipelineStepService}
 import org.slf4j.{Logger, LoggerFactory}
-
-/**
-  * @param reason the reason why we aborted the post-storage scripts
-  */
-@SerialVersionUID(0L)
-case class AbortPostStorage(reason: String)
+import play.api.libs.json.JsObject
 
 /**
   * Message sent through every PostStorageApi
@@ -17,7 +14,11 @@ case class AbortPostStorage(reason: String)
   * @param abortPostStorage if this value is received, we do not go any next post-storage stage
   */
 @SerialVersionUID(0L)
-case class PostStorageMessage(fileMetadata: FileMetadata, rawFileContent: RawFileContent, abortPostStorage: Option[AbortPostStorage])
+case class PostStorageMessage(override val fileMetadata: FileMetadata, override val abort: Option[AbortStep], rawFileContent: Option[RawFileContent], downloadMetadata: Option[JsObject]) extends PipelineStepMessage(fileMetadata, abort)
+
+object PostStorageMessage {
+  def from(storageMessage: StorageMessage): PostStorageMessage = PostStorageMessage(storageMessage.fileMetadata, storageMessage.abort, storageMessage.rawFileContent, storageMessage.downloadMetadata)
+}
 
 /**
   * Every post-download process must extends this trait.
@@ -42,6 +43,6 @@ class PostStorage extends PostStorageApi {
   }
 }
 
-object PostStorage {
-  val TYPE: String = "poststorage"
+object PostStorage extends PipelineStep{
+  override val TYPE: String = "poststorage"
 }

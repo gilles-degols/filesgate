@@ -1,7 +1,7 @@
 package net.degols.filesgate.libs.filesgate.pipeline.datasource
 
 import net.degols.filesgate.libs.filesgate.orm.FileMetadata
-import net.degols.filesgate.libs.filesgate.pipeline.PipelineStepService
+import net.degols.filesgate.libs.filesgate.pipeline.{PipelineStep, PipelineStepService}
 import org.slf4j.{Logger, LoggerFactory}
 
 /**
@@ -22,6 +22,7 @@ class DataSource extends DataSourceApi {
   override def process(sourceSeed: DataSourceSeed): Iterator[FileMetadata] = ???
 }
 
-object DataSource {
-  val TYPE: String = "datasource"
+object DataSource extends PipelineStep {
+  override val TYPE: String = "datasource"
+  override val MANDATORY: Boolean = true
 }

@@ -9,6 +9,7 @@ import net.degols.filesgate.libs.cluster.messages.{Communication, LoadBalancerTy
 import net.degols.filesgate.libs.filesgate.core.EngineLeader
 import org.slf4j.LoggerFactory
 import javax.inject.Singleton
+import net.degols.filesgate.libs.filesgate.pipeline.PipelineStep
 import net.degols.filesgate.libs.filesgate.pipeline.download.Download
 import net.degols.filesgate.libs.filesgate.pipeline.matcher.Matcher
 import net.degols.filesgate.libs.filesgate.pipeline.poststorage.PostStorage
@@ -159,22 +160,6 @@ class FilesgateConfiguration @Inject()(val defaultConfig: Config) {
     res
   }
 
-  /**
-    * Return a list of the different pipeline stages
-    * As value, we have a boolean saying if the related step is mandatory
-    *
-    * Only the "source" is mandatory and should be implemented by the developer (unless a mapping is given).
-    * The "download" is a mandatory step, but does not need to be provided by the user.
-    */
-  val PIPELINE_STEP_TYPES: Map[String, Boolean] = Map(
-    DataSource.TYPE      -> true, // Mandatory for the developer
-    Matcher.TYPE     -> false,
-    PreDownload.TYPE -> false,
-    Download.TYPE    -> true, // Mandatory for the internal working
-    PreStorage.TYPE  -> false,
-    Storage.TYPE     -> false,
-    PostStorage.TYPE -> false
-  )
 
   /**
     * Add missing (mandatory) pipeline steps between the ones defined by the user. If they weren't overrided.
@@ -183,17 +168,17 @@ class FilesgateConfiguration @Inject()(val defaultConfig: Config) {
   private def completePipelineSteps(pipelineId: String, userSteps: List[Step]): List[Step] = {
 
     // Complete the steps and directly order them correctly
-    val completeSteps: List[Step] = PIPELINE_STEP_TYPES.flatMap {
-      case (stepType, mandatory) => {
-        val matchingSteps = userSteps.filter(_.tpe == stepType)
+    val completeSteps: List[Step] = FilesgateConfiguration.PIPELINE_STEP_TYPES.flatMap {
+      stepType => {
+        val matchingSteps = userSteps.filter(_.tpe == stepType.TYPE)
         if (matchingSteps.size > 1) {
-          logger.error(s"More than one step for ${pipelineId}: ${stepType}. This is not yet supported. Abort.")
+          logger.error(s"More than one step for ${pipelineId}: ${stepType.TYPE}. This is not yet supported. Abort.")
           throw new Exception("Invalid pipeline configuration")
           None
         } else if (matchingSteps.nonEmpty) {
           matchingSteps.headOption
-        } else if(mandatory) {
-          logger.error(s"Missing mandatory step for ${pipelineId}: $stepType. Abort.")
+        } else if(stepType.MANDATORY) {
+          logger.error(s"Missing mandatory step for ${pipelineId}: ${stepType.TYPE}. Abort.")
           throw new Exception("Invalid pipeline configuration")
           None
         } else { // Normal behavior, nothing to add
@@ -211,4 +196,16 @@ class FilesgateConfiguration @Inject()(val defaultConfig: Config) {
   private def getStringList(path: String): List[String] = {
     config.getStringList(path).asScala.toList
   }
+}
+
+object FilesgateConfiguration {
+
+  /**
+    * Return a list of the different pipeline stages
+    * As value, we have a boolean saying if the related step is mandatory
+    *
+    * Only the "source" is mandatory and should be implemented by the developer (unless a mapping is given).
+    * The "download" is a mandatory step, but does not need to be provided by the user.
+    */
+  val PIPELINE_STEP_TYPES: List[PipelineStep] = List(DataSource, Matcher, PreDownload, Download, PreStorage, Storage, PostStorage)
 }

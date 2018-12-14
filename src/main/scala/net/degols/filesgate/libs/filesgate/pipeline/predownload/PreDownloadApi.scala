@@ -1,17 +1,9 @@
 package net.degols.filesgate.libs.filesgate.pipeline.predownload
 
 import net.degols.filesgate.libs.filesgate.orm.FileMetadata
-import net.degols.filesgate.libs.filesgate.pipeline.PipelineStepService
+import net.degols.filesgate.libs.filesgate.pipeline.matcher.MatcherMessage
+import net.degols.filesgate.libs.filesgate.pipeline.{AbortStep, PipelineStep, PipelineStepMessage, PipelineStepService}
 import org.slf4j.{Logger, LoggerFactory}
-
-/**
-  * @param reason the reason why we aborted the download
-  * @param rescheduleSeconds if the value is filled, it means we do not want to download the file right now, but in
-  *                          x seconds. The message won't go to any next pre-processing step. If the value is negative,
-  *                          we will never re-schedule it.
-  */
-@SerialVersionUID(0L)
-case class AbortDownload(reason: String, rescheduleSeconds: Option[Long])
 
 /**
   * Message sent through every PreDownloadApi before the actual download of a file
@@ -19,7 +11,11 @@ case class AbortDownload(reason: String, rescheduleSeconds: Option[Long])
   * @param abortDownload if this value is received, we do not go any next pre-download stage
   */
 @SerialVersionUID(0L)
-case class PreDownloadMessage(fileMetadata: FileMetadata, abortDownload: Option[AbortDownload])
+case class PreDownloadMessage(override val fileMetadata: FileMetadata, override val abort: Option[AbortStep]) extends PipelineStepMessage(fileMetadata, abort)
+
+object PreDownloadMessage {
+  def from(matcherMessage: MatcherMessage): PreDownloadMessage = PreDownloadMessage(matcherMessage.fileMetadata, matcherMessage.abort)
+}
 
 /**
   * Every pre-download process must extends this trait.
@@ -43,6 +39,6 @@ class PreDownload extends PreDownloadApi {
   }
 }
 
-object PreDownload {
-  val TYPE: String = "predownload"
+object PreDownload extends PipelineStep{
+  override val TYPE: String = "predownload"
 }

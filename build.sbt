@@ -44,6 +44,14 @@ lazy val clusterDependency = if(localClusterAvailable && useLocalClusterLibrary)
 }
 libraryDependencies ++= clusterDependency
 
+
+// Test
+libraryDependencies += "org.mockito" % "mockito-core" % "2.18.0" % Test
+libraryDependencies += "org.scalatest" %% "scalatest" % "3.2.0-SNAP10" % Test
+libraryDependencies += "org.scalatestplus.play" %% "scalatestplus-play" % "3.1.2" % Test
+libraryDependencies += "org.scalacheck" %% "scalacheck" % "1.13.5" % Test
+libraryDependencies += "com.typesafe.akka" %% "akka-testkit" % "2.5.19" % Test
+
 // play json
 libraryDependencies += "com.typesafe.play" %% "play-json" % playVersion
 
