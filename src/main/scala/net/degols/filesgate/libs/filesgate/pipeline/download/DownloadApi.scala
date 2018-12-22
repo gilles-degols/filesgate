@@ -1,12 +1,22 @@
 package net.degols.filesgate.libs.filesgate.pipeline.download
 
+import java.nio.file.Files.newOutputStream
+import java.nio.file.Paths
+import java.util.Date
+
+import akka.stream.scaladsl.Sink
+import akka.util.ByteString
 import net.degols.filesgate.libs.filesgate.orm.{FileMetadata, RawFileContent}
 import net.degols.filesgate.libs.filesgate.pipeline.matcher.MatcherMessage
 import net.degols.filesgate.libs.filesgate.pipeline.predownload.PreDownloadMessage
 import net.degols.filesgate.libs.filesgate.pipeline.{AbortStep, PipelineStep, PipelineStepMessage, PipelineStepService}
 import net.degols.filesgate.libs.filesgate.pipeline.prestorage.PreStorageMessage
+import net.degols.filesgate.libs.filesgate.utils.Tools
 import org.slf4j.{Logger, LoggerFactory}
 import play.api.libs.json.JsObject
+
+import scala.concurrent.{Await, Future}
+import scala.util.Try
 
 
 /**
@@ -33,9 +43,10 @@ trait DownloadApi extends PipelineStepService {
   def process(downloadMessage: DownloadMessage): DownloadMessage
 
   final override def process(message: Any): Any = process(message.asInstanceOf[DownloadMessage])
+
 }
 
-class Download extends DownloadApi {
+class Download() extends DownloadApi {
   private val logger: Logger = LoggerFactory.getLogger(getClass)
 
   /**

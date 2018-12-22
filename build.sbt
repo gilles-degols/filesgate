@@ -1,3 +1,4 @@
+
 name := "fgate" // Intellij Idea does not like having a project with a sub-project having the same name
 organization := "net.degols.filesgate.libs"
 version := "0.0.1"
@@ -24,6 +25,9 @@ libraryDependencies ++= Seq(
 libraryDependencies += "joda-time" % "joda-time" % "2.10"
 
 libraryDependencies += "commons-io" % "commons-io" % "2.4"
+
+libraryDependencies += "com.typesafe.play" %% "play-ws" % playVersion
+
 
 // Cluster library
 val clusterLibraryVersion = "0.0.1"
