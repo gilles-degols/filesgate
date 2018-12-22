@@ -1,6 +1,6 @@
 
 name := "fgate" // Intellij Idea does not like having a project with a sub-project having the same name
-organization := "net.degols.filesgate.libs"
+organization := "net.degols.libs"
 version := "0.0.1"
 
 scalacOptions ++= Seq("-deprecation", "-feature", "-language:postfixOps")
