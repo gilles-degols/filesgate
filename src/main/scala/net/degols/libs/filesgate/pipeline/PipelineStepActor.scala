@@ -12,12 +12,17 @@ import net.degols.libs.filesgate.pipeline.predownload.{PreDownloadApi, PreDownlo
 import net.degols.libs.filesgate.pipeline.prestorage.{PreStorageApi, PreStorageMessage}
 import net.degols.libs.filesgate.pipeline.datasource.{DataSourceApi, DataSourceSeed}
 import net.degols.libs.filesgate.pipeline.matcher.MatcherApi
+import net.degols.libs.filesgate.utils.PriorityStashedActor
 import org.slf4j.{Logger, LoggerFactory}
+
+import scala.collection.mutable
+import scala.collection.mutable.ListBuffer
+import scala.concurrent.{ExecutionContext, Future}
 
 /**
   * Wrapper receiving every message from the core/EngineActor
   */
-class PipelineStepActor(pipelineStepService: PipelineStepService) extends Actor {
+class PipelineStepActor(implicit val ec: ExecutionContext, pipelineStepService: PipelineStepService) extends PriorityStashedActor {
   private val logger: Logger = LoggerFactory.getLogger(getClass)
 
   var pipelineInstanceActor: Option[ActorRef] = None
@@ -26,6 +31,7 @@ class PipelineStepActor(pipelineStepService: PipelineStepService) extends Actor 
     case x: PipelineStepToHandle =>
       // Every PipelineInstance will want that we work for them, but
       sender() ! PipelineStepWorkingOn(pipelineStepService.id.get, pipelineStepService.pipelineInstanceId.get, pipelineStepService.pipelineManagerId.get, pipelineStepService.name.get)
+      endProcessing(x)
 
     case message: DataSourceSeed => // Return the Source directly, not a message
       pipelineStepService match {
@@ -34,19 +40,35 @@ class PipelineStepActor(pipelineStepService: PipelineStepService) extends Actor 
           val source: Source[FileMetadata, NotUsed] = Source.fromIterator(() => iter)
           sender() ! source
         case _ =>
-          logger.warn(s"Received a SourceSeed even though we do not have a SourceApi...: ${message}")
+          logger.warn(s"$id: Received a SourceSeed even though we do not have a SourceApi...: ${message}")
       }
+      endProcessing(message)
 
     case message: PipelineStepMessage =>
-      sender() ! pipelineStepService.process(message)
+      logger.debug(s"$id: Start processing PipelineStepMessage $message")
+      val res = pipelineStepService.process(message)
+      val originalSender = sender()
+      res match {
+        case future: Future[Any] =>
+          val notify = future.map(result => {
+            originalSender ! result
+            logger.debug(s"$id: End processing PipelineStepMessage $message")})
+          endProcessing(message, notify)
+        case _ =>
+          originalSender ! res
+          logger.debug(s"$id: End processing PipelineStepMessage $message")
+          endProcessing(message)
+
+      }
 
     case message =>
-      logger.warn(s"Received unknown message in the PipelineStepActor (state: running) ${message}")
+      logger.warn(s"$id: Received unknown message in the PipelineStepActor (state: running) ${message}")
+      endProcessing(message)
   }
 
   override def receive = {
     case x: PipelineStepToHandle => // This message is necessary to switch to the running state. It is sent by a PipelineInstance
-      logger.debug("Received the pipeline instance id for which we should work on.")
+      logger.debug(s"$id: Received the pipeline instance id for which we should work on.")
       pipelineStepService.setId(x.id)
       pipelineStepService.setPipelineInstanceId(x.pipelineInstanceId)
       pipelineStepService.setPipelineManagerId(x.pipelineManagerId)
@@ -59,8 +81,12 @@ class PipelineStepActor(pipelineStepService: PipelineStepService) extends Actor 
       context.watch(sender())
 
       context.become(running)
+      setId(pipelineStepService.id.get+"/"+pipelineStepService.name.get)
+      endProcessing(x)
+
 
     case message =>
-      logger.warn(s"Received unknown message in the PipelineStepActor (state: receive): ${message}")
+      logger.warn(s"$id: Received unknown message in the PipelineStepActor (state: receive): ${message}")
+      endProcessing(message)
   }
 }

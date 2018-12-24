@@ -1,11 +1,16 @@
 package net.degols.libs.filesgate.core
 
 import akka.actor.ActorRef
-import net.degols.libs.filesgate.utils.UnknownPipelineStep
+import net.degols.libs.filesgate.utils.{PriorityStashedMessage, UnknownPipelineStep}
 import play.api.libs.json.JsResult.Exception
 
-
-trait EngineInternalMessage
+/**
+  * Every message sent to PipelineStepActor must extend this one. Any priority in [0;10[ is reserved for internal use of
+  * PriorityStashedActor. Priority [10;20[ is reserved for filesgate itself.
+  * @param priority
+  */
+@SerialVersionUID(0L)
+abstract class EngineInternalMessage(priority: Int = 15) extends PriorityStashedMessage(priority)
 
 abstract class PipelineStepType(val id: String)
 case class PreDownloadStep() extends PipelineStepType(id = "PreDownloadStep")

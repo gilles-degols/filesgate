@@ -22,7 +22,12 @@ import scala.util.{Failure, Success, Try}
   * Result of a call to downloadFile. Children can contains the Array[Byte] in RAM, or a path to the given file where
   * we had to store the result
   */
-abstract class DownloadedFile(url: String, statusCode: Int, start: Date, end: Date, size: Long){}
+abstract class DownloadedFile(url: String, statusCode: Int, start: Date, end: Date, size: Long){
+  override def toString: String = {
+    val time = end.getTime - start.getTime
+    s"DownloadedFile (status: $statusCode, time: $time ms): ${size/1024} kB @ $url"
+  }
+}
 
 case class DownloadedFileToDisk(url: String, statusCode: Int, start: Date, end: Date, size: Long, path: Option[String]) extends DownloadedFile(url, statusCode, start, end, size)
 case class DownloadedFileToMemory(url: String, statusCode: Int, start: Date, end: Date, size: Long, content: Option[Array[Byte]]) extends DownloadedFile(url, statusCode, start, end, size)
@@ -126,10 +131,10 @@ class Tools @Inject()(implicit mat: Materializer, implicit val fut: Futures, con
     * @return
     */
   private def computeBandwidthRate(fileSize: Long, start: Date, end: Date): String = {
-    val timeDifference: Long = math.max(1L,(end.getTime - start.getTime)/1000L)
+    val timeDifference: Double = math.max(0.00001,(end.getTime - start.getTime)/1000.0)
 
-    if(fileSize / timeDifference > 1024L*1024L) s"${fileSize / (timeDifference * 1024L * 1024L)} MB/s"
-    else if(fileSize / timeDifference > 1024L) s"${fileSize / (timeDifference * 1024L)} kB/s"
-    else s"${fileSize / timeDifference} B/s"
+    if(fileSize / timeDifference > 1024L*1024L) s"${(fileSize / (timeDifference * 1024L * 1024L)).toInt} MB/s"
+    else if(fileSize / timeDifference > 1024L) s"${(fileSize / (timeDifference * 1024L)).toInt} kB/s"
+    else s"${(fileSize / timeDifference).toInt} B/s"
   }
 }

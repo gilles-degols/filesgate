@@ -1,5 +1,7 @@
 package net.degols.libs.filesgate.core
 
+import java.util.concurrent.{ExecutorService, Executors}
+
 import akka.actor.{Actor, ActorRef, Kill, Props}
 import net.degols.libs.election.{ConfigurationService, ElectionService, ElectionWrapper}
 import org.slf4j.LoggerFactory
@@ -14,11 +16,12 @@ import net.degols.libs.filesgate.core.engine.{Engine, EngineActor}
 import net.degols.libs.filesgate.core.pipelineinstance.{PipelineInstance, PipelineInstanceActor}
 import net.degols.libs.filesgate.core.pipelinemanager.{PipelineManager, PipelineManagerActor}
 import net.degols.libs.filesgate.pipeline.{PipelineStepActor, PipelineStepService}
-import net.degols.libs.filesgate.utils.FilesgateConfiguration
+import net.degols.libs.filesgate.utils.{FilesgateConfiguration, Tools}
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.util.Try
-
+import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.{ExecutionContext, ExecutionContextExecutor}
 
 /**
   * This class must be extended by the developer
@@ -36,6 +39,9 @@ abstract class EngineLeader @Inject()(engine: Engine,
                                       filesgateConfiguration: FilesgateConfiguration,
                                       cluster: Cluster)
   extends WorkerLeader(electionService, configurationService, clusterConfiguration, cluster){
+
+  val threadPool: ExecutorService = Executors.newFixedThreadPool(20)
+  implicit val ec: ExecutionContextExecutor =  ExecutionContext.fromExecutor(threadPool)
 
   private val logger = LoggerFactory.getLogger(getClass)
 
@@ -69,7 +75,7 @@ abstract class EngineLeader @Inject()(engine: Engine,
     */
   final def instantiatePipelineStep(workerTypeId: String, actorName: String): ActorRef = {
     val service: PipelineStepService = startStepService(workerTypeId)
-    context.actorOf(Props.create(classOf[PipelineStepActor], service))
+    context.actorOf(Props.create(classOf[PipelineStepActor], ec, service))
   }
 
 

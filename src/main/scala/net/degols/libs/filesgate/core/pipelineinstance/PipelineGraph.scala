@@ -73,7 +73,8 @@ class PipelineGraph(filesgateConfiguration: FilesgateConfiguration) {
     * Load the sink steps
     */
   def loadSinkSteps(): Sink[Any, Future[Done]] = {
-    Sink.foreach(x => logger.debug(s"stuff: $x"))
+    //Sink.ignore
+    Sink.foreach(x => logger.debug(s"Sink ignore: $x"))
   }
 
   /**
@@ -169,7 +170,8 @@ class PipelineGraph(filesgateConfiguration: FilesgateConfiguration) {
     */
   private def loadAnySteps(pipelineStepStatuses: List[PipelineStepStatus]): Flow[PipelineStepMessage, PipelineStepMessage, NotUsed] = {
     pipelineStepStatuses.map(pipelineStepStatus => {
-    Flow[PipelineStepMessage].mapAsync(5)(m => {
+    Flow[PipelineStepMessage].mapAsync(50)(m => {
+      logger.debug(s"Pipeline graph step: send message $m")
         (pipelineStepStatus.actorRef.get ? m)
           .map(_.asInstanceOf[PipelineStepMessage])
       }).filter(_.abort.isEmpty)

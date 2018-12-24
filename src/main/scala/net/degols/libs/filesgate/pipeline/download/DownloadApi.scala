@@ -40,24 +40,21 @@ trait DownloadApi extends PipelineStepService {
     * @param downloadMessage
     * @return
     */
-  def process(downloadMessage: DownloadMessage): DownloadMessage
+  def process(downloadMessage: DownloadMessage): Future[DownloadMessage]
 
   final override def process(message: Any): Any = process(message.asInstanceOf[DownloadMessage])
 
 }
 
+/*
 class Download() extends DownloadApi {
   private val logger: Logger = LoggerFactory.getLogger(getClass)
 
-  /**
-    * @param downloadMessage
-    * @return
-    */
   override def process(downloadMessage: DownloadMessage): DownloadMessage = {
     logger.debug(s"$id: processing $downloadMessage")
     downloadMessage
   }
-}
+}*/
 
 object Download extends PipelineStep{
   override val TYPE: String = "download"

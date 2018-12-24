@@ -1,5 +1,6 @@
 package net.degols.libs.filesgate.pipeline
 
+import net.degols.libs.filesgate.core.EngineInternalMessage
 import net.degols.libs.filesgate.orm.FileMetadata
 
 trait PipelineStep {
@@ -18,4 +19,4 @@ case class AbortStep(reason: String, rescheduleSeconds: Option[Long])
 
 
 @SerialVersionUID(0L)
-abstract class PipelineStepMessage(val fileMetadata: FileMetadata, val abort: Option[AbortStep])
+abstract class PipelineStepMessage(val fileMetadata: FileMetadata, val abort: Option[AbortStep]) extends EngineInternalMessage
