@@ -107,7 +107,8 @@ abstract class PriorityStashedActor(implicit ec: ExecutionContext) extends Actor
           messageWrapper._2.creationTime < new DateTime().getMillis - _maximumTimeProcessingMs
         }).toList
 
-        if(messagesToRemove.nonEmpty) {
+        // We only remove running messages if there are waiting messages
+        if(messagesToRemove.nonEmpty && customStash.values.map(_.size).sum > 0) {
           logger.error(s"$id: GarbageCollector must remove ${messagesToRemove.size} old messages. Please investigate or increase maximumTimeProcessingMs (value is ${maximumTimeProcessingMs} ms). Existing messages: ${runningMessages.values.toList}")
           messagesToRemove.foreach(messageWrapper => {
            runningMessages.remove(messageWrapper._1)
