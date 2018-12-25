@@ -7,6 +7,7 @@ import net.degols.libs.filesgate.pipeline.{AbortStep, PipelineStep, PipelineStep
 import org.slf4j.{Logger, LoggerFactory}
 import play.api.libs.json.JsObject
 
+import scala.concurrent.{ExecutionContext, Future}
 import scala.util.Try
 
 @SerialVersionUID(0L)
@@ -18,17 +19,19 @@ object StorageMessage {
 
 
 trait StorageApi extends PipelineStepService {
-  def process(storeMessage: StorageMessage): StorageMessage
+  def process(storeMessage: StorageMessage): Future[StorageMessage]
 
   final override def process(message: Any): Any = process(message.asInstanceOf[StorageMessage])
 }
 
-class Storage extends StorageApi {
+class Storage(implicit val ec: ExecutionContext) extends StorageApi {
   private val logger: Logger = LoggerFactory.getLogger(getClass)
 
-  override def process(storeMessage: StorageMessage): StorageMessage = {
-    logger.debug(s"$id: processing $storeMessage")
-    storeMessage
+  override def process(storeMessage: StorageMessage): Future[StorageMessage] = {
+    Future{
+      logger.debug(s"$id: processing $storeMessage")
+      storeMessage
+    }
   }
 }
 

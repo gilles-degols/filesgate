@@ -7,6 +7,8 @@ import net.degols.libs.filesgate.pipeline.{AbortStep, PipelineStep, PipelineStep
 import org.slf4j.{Logger, LoggerFactory}
 import play.api.libs.json.JsObject
 
+import scala.concurrent.{ExecutionContext, Future}
+
 /**
   * Message sent through every PostStorageApi
   * @param fileMetadata
@@ -28,18 +30,20 @@ trait PostStorageApi extends PipelineStepService {
     * @param postStorageMessage
     * @return
     */
-  def process(postStorageMessage: PostStorageMessage): PostStorageMessage
+  def process(postStorageMessage: PostStorageMessage): Future[PostStorageMessage]
 
   final override def process(message: Any): Any = process(message.asInstanceOf[PostStorageMessage])
 }
 
 
-class PostStorage extends PostStorageApi {
+class PostStorage(implicit val ec: ExecutionContext) extends PostStorageApi {
   private val logger: Logger = LoggerFactory.getLogger(getClass)
 
-  override def process(postStorageMessage: PostStorageMessage): PostStorageMessage = {
-    logger.debug(s"$id: processing $postStorageMessage")
-    postStorageMessage
+  override def process(postStorageMessage: PostStorageMessage): Future[PostStorageMessage] = {
+    Future{
+      logger.debug(s"$id: processing $postStorageMessage")
+      postStorageMessage
+    }
   }
 }
 
