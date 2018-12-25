@@ -4,8 +4,8 @@ import java.io.File
 
 import akka.NotUsed
 import akka.actor.ActorSystem
+import akka.stream.scaladsl.Source
 import akka.testkit.{ImplicitSender, TestActors, TestKit}
-import com.google.inject.matcher.Matchers
 import com.typesafe.config.{Config, ConfigFactory}
 import net.degols.libs.cluster.messages.{BasicLoadBalancerType, ClusterInstance}
 import net.degols.libs.filesgate.core.{PipelineStepRunning, PipelineStepStatus}
@@ -18,13 +18,11 @@ import net.degols.libs.filesgate.pipeline.predownload.PreDownload
 import net.degols.libs.filesgate.pipeline.prestorage.PreStorage
 import net.degols.libs.filesgate.pipeline.storage.Storage
 import net.degols.libs.filesgate.utils.{FilesgateConfiguration, PipelineMetadata, Step}
-import org.scalatest._
-import org.mockito.Mockito._
-import play.api.libs.json.{JsObject, Json}
-import akka.stream.scaladsl.Source
 import org.mockito.ArgumentMatchers
+import org.mockito.Mockito._
+import org.scalatest._
 import org.scalatest.mockito.MockitoSugar
-import play.api.test.StubControllerComponentsFactory
+import play.api.libs.json.{JsObject, Json}
 
 
 class PipelineGraphSpec extends TestKit(ActorSystem("MySpec")) with MockitoSugar with ImplicitSender with WordSpecLike with PrivateMethodTester with BeforeAndAfter{

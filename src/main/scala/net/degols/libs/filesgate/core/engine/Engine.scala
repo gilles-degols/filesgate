@@ -1,11 +1,10 @@
 package net.degols.libs.filesgate.core.engine
 
-import javax.inject.{Inject, Singleton}
-
 import akka.actor.{ActorContext, ActorRef}
+import javax.inject.{Inject, Singleton}
 import net.degols.libs.cluster.messages.Communication
-import net.degols.libs.filesgate.core.pipelinemanager.{PipelineManager, PipelineManagerActor}
 import net.degols.libs.filesgate.core._
+import net.degols.libs.filesgate.core.pipelinemanager.PipelineManagerActor
 import net.degols.libs.filesgate.utils.FilesgateConfiguration
 import org.slf4j.{Logger, LoggerFactory}
 

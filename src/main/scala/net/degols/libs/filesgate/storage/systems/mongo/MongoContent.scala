@@ -1,15 +1,13 @@
 package net.degols.libs.filesgate.storage.systems.mongo
 
-import java.util.concurrent.Executors
-
-import javax.inject.Singleton
 import com.google.inject.Inject
+import javax.inject.Singleton
 import net.degols.libs.filesgate.orm.FileContent
 import net.degols.libs.filesgate.storage.StorageContentApi
 import net.degols.libs.filesgate.utils.{FilesgateConfiguration, Tools}
 import org.slf4j.{Logger, LoggerFactory}
 
-import scala.concurrent.{ExecutionContext, ExecutionContextExecutor}
+import scala.concurrent.ExecutionContextExecutor
 
 
 /**

@@ -1,7 +1,5 @@
 package net.degols.libs.filesgate.pipeline
 
-import net.degols.libs.filesgate.pipeline.prestorage.PreStorageMessage
-
 /**
   * Contain the logic of any PipelineStep. Must be extended when we implement a PipelineStep
   */

@@ -1,21 +1,12 @@
 package net.degols.libs.filesgate.core.pipelineinstance
 
-import akka.NotUsed
 import akka.actor.{ActorContext, ActorRef}
 import net.degols.libs.cluster.messages.Communication
 import net.degols.libs.filesgate.core._
-import net.degols.libs.filesgate.pipeline.datasource.{DataSource, DataSourceSeed}
 import net.degols.libs.filesgate.utils.{FilesgateConfiguration, PipelineMetadata, Step}
 import org.slf4j.{Logger, LoggerFactory}
 
 import scala.util.{Failure, Random, Success, Try}
-import akka.pattern.ask
-import akka.stream.scaladsl.Source
-import akka.util.Timeout
-import net.degols.libs.filesgate.Tools
-import net.degols.libs.filesgate.orm.FileMetadata
-
-import scala.concurrent.duration._
 
 /**
   * Work for only one PipelineInstanceActor linked to only one PipelineManager. Handle multiple PipelineStepActors

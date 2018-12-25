@@ -4,6 +4,7 @@ import akka.actor.{Actor, Terminated}
 import net.degols.libs.filesgate.core.{PipelineManagerWorkingOn, Start}
 import net.degols.libs.filesgate.utils.FilesgateConfiguration
 import org.slf4j.LoggerFactory
+
 import scala.concurrent.ExecutionContext.Implicits.global
 
 case object CheckPipelineManagerState

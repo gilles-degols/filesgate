@@ -2,8 +2,6 @@ package net.degols.libs.filesgate.pipeline.matcher
 
 import net.degols.libs.filesgate.orm.FileMetadata
 import net.degols.libs.filesgate.pipeline.{AbortStep, PipelineStep, PipelineStepMessage, PipelineStepService}
-import net.degols.libs.filesgate.pipeline.download.{DownloadApi, DownloadMessage}
-import net.degols.libs.filesgate.pipeline.predownload.PreDownloadMessage
 import org.slf4j.{Logger, LoggerFactory}
 
 import scala.concurrent.{ExecutionContext, Future}

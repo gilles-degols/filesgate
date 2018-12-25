@@ -1,9 +1,8 @@
 package net.degols.libs.filesgate.storage.systems.mongo
 
-import com.google.inject.Inject
-import com.mongodb.{MongoBulkWriteException, client}
-import com.mongodb.client.model.{CreateCollectionOptions, IndexOptions, InsertManyOptions}
 import com.mongodb.client._
+import com.mongodb.client.model.{CreateCollectionOptions, IndexOptions, InsertManyOptions}
+import com.mongodb.{MongoBulkWriteException, client}
 import net.degols.libs.filesgate.utils.{FilesgateConfiguration, Tools}
 import org.bson.Document
 import org.bson.types.ObjectId

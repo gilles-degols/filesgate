@@ -1,7 +1,6 @@
 package net.degols.libs.filesgate.pipeline.poststorage
 
 import net.degols.libs.filesgate.orm.{FileMetadata, RawFileContent}
-import net.degols.libs.filesgate.pipeline.prestorage.PreStorageMessage
 import net.degols.libs.filesgate.pipeline.storage.StorageMessage
 import net.degols.libs.filesgate.pipeline.{AbortStep, PipelineStep, PipelineStepMessage, PipelineStepService}
 import org.slf4j.{Logger, LoggerFactory}

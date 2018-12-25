@@ -2,25 +2,20 @@ package net.degols.libs.filesgate.core
 
 import java.util.concurrent.{ExecutorService, Executors}
 
-import akka.actor.{Actor, ActorRef, Kill, Props}
-import net.degols.libs.election.{ConfigurationService, ElectionService, ElectionWrapper}
-import org.slf4j.LoggerFactory
+import akka.actor.{ActorRef, Props}
 import javax.inject.{Inject, Singleton}
-
-import scala.concurrent.duration._
-import net.degols.libs.cluster.{ClusterConfiguration, Tools}
+import net.degols.libs.cluster.ClusterConfiguration
 import net.degols.libs.cluster.core.Cluster
-import net.degols.libs.cluster.manager.{Manager, WorkerLeader}
+import net.degols.libs.cluster.manager.WorkerLeader
 import net.degols.libs.cluster.messages._
+import net.degols.libs.election.{ConfigurationService, ElectionService}
 import net.degols.libs.filesgate.core.engine.{Engine, EngineActor}
-import net.degols.libs.filesgate.core.pipelineinstance.{PipelineInstance, PipelineInstanceActor}
-import net.degols.libs.filesgate.core.pipelinemanager.{PipelineManager, PipelineManagerActor}
+import net.degols.libs.filesgate.core.pipelineinstance.PipelineInstanceActor
+import net.degols.libs.filesgate.core.pipelinemanager.PipelineManagerActor
 import net.degols.libs.filesgate.pipeline.{PipelineStepActor, PipelineStepService}
-import net.degols.libs.filesgate.utils.{FilesgateConfiguration, Tools}
+import net.degols.libs.filesgate.utils.FilesgateConfiguration
+import org.slf4j.LoggerFactory
 
-import scala.concurrent.ExecutionContext.Implicits.global
-import scala.util.Try
-import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor}
 
 /**

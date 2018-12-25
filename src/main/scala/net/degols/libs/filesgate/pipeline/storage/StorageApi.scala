@@ -1,14 +1,12 @@
 package net.degols.libs.filesgate.pipeline.storage
 
 import net.degols.libs.filesgate.orm.{FileMetadata, RawFileContent}
-import net.degols.libs.filesgate.pipeline.download.DownloadMessage
 import net.degols.libs.filesgate.pipeline.prestorage.PreStorageMessage
 import net.degols.libs.filesgate.pipeline.{AbortStep, PipelineStep, PipelineStepMessage, PipelineStepService}
 import org.slf4j.{Logger, LoggerFactory}
 import play.api.libs.json.JsObject
 
 import scala.concurrent.{ExecutionContext, Future}
-import scala.util.Try
 
 @SerialVersionUID(0L)
 case class StorageMessage(override val fileMetadata: FileMetadata, override val abort: Option[AbortStep], rawFileContent: Option[RawFileContent], downloadMetadata: Option[JsObject]) extends PipelineStepMessage(fileMetadata, abort)

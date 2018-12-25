@@ -11,12 +11,11 @@ import akka.util.ByteString
 import javax.inject.Inject
 import org.slf4j.{Logger, LoggerFactory}
 import play.api.libs.concurrent.Futures
-import play.api.libs.ws.{WSClient, WSResponse}
 import play.api.libs.concurrent.Futures._
+import play.api.libs.ws.{WSClient, WSResponse}
 
 import scala.concurrent.duration._
-import scala.concurrent.{Await, ExecutionContext, ExecutionContextExecutor, Future}
-import scala.util.{Failure, Success, Try}
+import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
 
 /**
   * Result of a call to downloadFile. Children can contains the Array[Byte] in RAM, or a path to the given file where

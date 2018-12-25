@@ -2,7 +2,6 @@ package net.degols.libs.filesgate.core
 
 import akka.actor.ActorRef
 import net.degols.libs.filesgate.utils.{PriorityStashedMessage, UnknownPipelineStep}
-import play.api.libs.json.JsResult.Exception
 
 /**
   * Every message sent to PipelineStepActor must extend this one. Any priority in [0;10[ is reserved for internal use of

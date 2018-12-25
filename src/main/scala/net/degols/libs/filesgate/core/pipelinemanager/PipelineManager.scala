@@ -1,8 +1,7 @@
 package net.degols.libs.filesgate.core.pipelinemanager
 
-import javax.inject.Inject
-
 import akka.actor.{ActorContext, ActorRef}
+import javax.inject.Inject
 import net.degols.libs.cluster.messages.Communication
 import net.degols.libs.filesgate.core._
 import net.degols.libs.filesgate.core.pipelineinstance.PipelineInstanceActor

@@ -1,19 +1,17 @@
 package net.degols.libs.filesgate.utils
 
-import java.math.BigInteger
-
 import akka.actor.{Actor, ActorRef, ActorSystem, Cancellable}
-import akka.dispatch.{BoundedMessageQueueSemantics, PriorityGenerator, RequiresMessageQueue, UnboundedStablePriorityMailbox}
+import akka.dispatch.{PriorityGenerator, UnboundedStablePriorityMailbox}
 import com.typesafe.config.Config
+import org.bson.types.ObjectId
 import org.joda.time.DateTime
 import org.slf4j.{Logger, LoggerFactory}
 
 import scala.collection.mutable
 import scala.collection.mutable.ListBuffer
+import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success}
-import scala.concurrent.duration._
-import org.bson.types.ObjectId
 
 /**
   * Priority between [0;10[ is reserved for the PriorityStashedActor. Other messages should extend PriorityStashedMessage

@@ -1,23 +1,14 @@
 package net.degols.libs.filesgate.pipeline.download
 
-import java.nio.file.Files.newOutputStream
-import java.nio.file.Paths
-import java.util.Date
-
-import akka.stream.scaladsl.Sink
-import akka.util.ByteString
 import net.degols.libs.cluster.Tools
 import net.degols.libs.filesgate.orm.{FileMetadata, RawFileContent}
-import net.degols.libs.filesgate.pipeline.matcher.MatcherMessage
 import net.degols.libs.filesgate.pipeline.predownload.PreDownloadMessage
 import net.degols.libs.filesgate.pipeline.{AbortStep, PipelineStep, PipelineStepMessage, PipelineStepService}
-import net.degols.libs.filesgate.pipeline.prestorage.PreStorageMessage
 import net.degols.libs.filesgate.utils.Tools
 import org.slf4j.{Logger, LoggerFactory}
 import play.api.libs.json.{JsObject, Json}
 
-import scala.concurrent.{Await, ExecutionContext, Future}
-import scala.util.Try
+import scala.concurrent.{ExecutionContext, Future}
 
 
 /**

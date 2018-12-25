@@ -4,19 +4,19 @@ import java.io.File
 
 import com.google.inject.Inject
 import com.typesafe.config.{Config, ConfigFactory, ConfigObject, ConfigValue}
-import net.degols.libs.cluster.{Tools => ClusterTools}
-import net.degols.libs.cluster.messages.{Communication, LoadBalancerType}
-import net.degols.libs.filesgate.core.EngineLeader
-import org.slf4j.LoggerFactory
 import javax.inject.Singleton
+import net.degols.libs.cluster.messages.{Communication, LoadBalancerType}
+import net.degols.libs.cluster.{Tools => ClusterTools}
+import net.degols.libs.filesgate.core.EngineLeader
 import net.degols.libs.filesgate.pipeline.PipelineStep
+import net.degols.libs.filesgate.pipeline.datasource.DataSource
 import net.degols.libs.filesgate.pipeline.download.Download
 import net.degols.libs.filesgate.pipeline.matcher.Matcher
 import net.degols.libs.filesgate.pipeline.poststorage.PostStorage
 import net.degols.libs.filesgate.pipeline.predownload.PreDownload
 import net.degols.libs.filesgate.pipeline.prestorage.PreStorage
-import net.degols.libs.filesgate.pipeline.datasource.DataSource
 import net.degols.libs.filesgate.pipeline.storage.Storage
+import org.slf4j.LoggerFactory
 
 import scala.collection.JavaConverters._
 import scala.concurrent.duration._

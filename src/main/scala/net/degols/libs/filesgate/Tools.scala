@@ -2,7 +2,8 @@ package net.degols.libs.filesgate
 
 import akka.actor.ActorRef
 import org.joda.time.{DateTime, DateTimeZone}
-import sys.process._
+
+import scala.sys.process._
 
 /**
   * Created by Gilles.Degols on 04-09-18.

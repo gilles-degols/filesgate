@@ -1,13 +1,11 @@
 package net.degols.libs.filesgate.core.pipelineinstance
 
-import akka.{Done, NotUsed}
 import akka.actor.ActorContext
 import akka.pattern.ask
 import akka.stream.ActorMaterializer
 import akka.stream.scaladsl.{Flow, Sink, Source}
 import akka.util.Timeout
-
-import scala.concurrent.duration._
+import akka.{Done, NotUsed}
 import net.degols.libs.cluster.messages.Communication
 import net.degols.libs.filesgate.core.PipelineStepStatus
 import net.degols.libs.filesgate.orm.FileMetadata
@@ -24,6 +22,7 @@ import org.slf4j.{Logger, LoggerFactory}
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
+import scala.concurrent.duration._
 import scala.util.{Failure, Success}
 
 /**

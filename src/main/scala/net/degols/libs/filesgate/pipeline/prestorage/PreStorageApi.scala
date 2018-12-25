@@ -2,7 +2,6 @@ package net.degols.libs.filesgate.pipeline.prestorage
 
 import net.degols.libs.filesgate.orm.{FileMetadata, RawFileContent}
 import net.degols.libs.filesgate.pipeline.download.DownloadMessage
-import net.degols.libs.filesgate.pipeline.predownload.PreDownloadMessage
 import net.degols.libs.filesgate.pipeline.{AbortStep, PipelineStep, PipelineStepMessage, PipelineStepService}
 import org.slf4j.{Logger, LoggerFactory}
 import play.api.libs.json.JsObject

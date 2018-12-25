@@ -1,8 +1,7 @@
 package net.degols.libs.filesgate.storage.systems.mongo
 
-import javax.inject.Singleton
 import com.google.inject.Inject
-import net.degols.libs.election.ConfigurationService
+import javax.inject.Singleton
 import net.degols.libs.filesgate.orm.FileMetadata
 import net.degols.libs.filesgate.storage.StorageMetadataApi
 import net.degols.libs.filesgate.utils.{FilesgateConfiguration, Tools}

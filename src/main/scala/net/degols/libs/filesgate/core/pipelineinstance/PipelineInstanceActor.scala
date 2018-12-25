@@ -2,7 +2,6 @@ package net.degols.libs.filesgate.core.pipelineinstance
 
 import akka.actor.{Actor, ActorRef, Kill, Terminated}
 import net.degols.libs.filesgate.core._
-import net.degols.libs.filesgate.core.pipelinemanager.{CheckPipelineInstanceState, PipelineManager}
 import net.degols.libs.filesgate.utils.FilesgateConfiguration
 import org.slf4j.{Logger, LoggerFactory}
 

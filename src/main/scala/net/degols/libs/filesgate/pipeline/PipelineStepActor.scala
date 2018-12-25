@@ -1,22 +1,14 @@
 package net.degols.libs.filesgate.pipeline
 
 import akka.NotUsed
-import akka.actor.{Actor, ActorRef}
+import akka.actor.ActorRef
 import akka.stream.scaladsl.Source
-import net.degols.libs.filesgate.core.pipelineinstance.CheckPipelineStepState
 import net.degols.libs.filesgate.core._
 import net.degols.libs.filesgate.orm.FileMetadata
-import net.degols.libs.filesgate.pipeline.download.{DownloadApi, DownloadMessage}
-import net.degols.libs.filesgate.pipeline.poststorage.{PostStorageApi, PostStorageMessage}
-import net.degols.libs.filesgate.pipeline.predownload.{PreDownloadApi, PreDownloadMessage}
-import net.degols.libs.filesgate.pipeline.prestorage.{PreStorageApi, PreStorageMessage}
 import net.degols.libs.filesgate.pipeline.datasource.{DataSourceApi, DataSourceSeed}
-import net.degols.libs.filesgate.pipeline.matcher.MatcherApi
 import net.degols.libs.filesgate.utils.PriorityStashedActor
 import org.slf4j.{Logger, LoggerFactory}
 
-import scala.collection.mutable
-import scala.collection.mutable.ListBuffer
 import scala.concurrent.{ExecutionContext, Future}
 
 /**
