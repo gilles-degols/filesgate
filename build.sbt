@@ -62,5 +62,9 @@ libraryDependencies += "com.typesafe.play" %% "play-json" % playVersion
 // Akka Remoting
 libraryDependencies += "com.typesafe.akka" %% "akka-remote" % akkaVersion
 
+// Mongo Java Driver
+// https://mvnrepository.com/artifact/org.mongodb/mongo-java-driver
+libraryDependencies += "org.mongodb" % "mongo-java-driver" % "3.7.0"
+
 // Akka streaming
 libraryDependencies += "com.typesafe.akka" %% "akka-stream" % akkaVersion

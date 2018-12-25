@@ -75,7 +75,7 @@ abstract class EngineLeader @Inject()(engine: Engine,
     */
   final def instantiatePipelineStep(workerTypeId: String, actorName: String): ActorRef = {
     val service: PipelineStepService = startStepService(workerTypeId)
-    context.actorOf(Props.create(classOf[PipelineStepActor], ec, service))
+    context.actorOf(Props.create(classOf[PipelineStepActor], ec, service).withMailbox("priority-stashed-actor"))
   }
 
 

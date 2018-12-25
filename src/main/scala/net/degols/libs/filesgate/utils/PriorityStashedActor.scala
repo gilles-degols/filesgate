@@ -2,7 +2,9 @@ package net.degols.libs.filesgate.utils
 
 import java.math.BigInteger
 
-import akka.actor.{Actor, ActorRef, Cancellable}
+import akka.actor.{Actor, ActorRef, ActorSystem, Cancellable}
+import akka.dispatch.{BoundedMessageQueueSemantics, PriorityGenerator, RequiresMessageQueue, UnboundedStablePriorityMailbox}
+import com.typesafe.config.Config
 import org.joda.time.DateTime
 import org.slf4j.{Logger, LoggerFactory}
 
@@ -33,6 +35,19 @@ case class GarbageCollector() extends PriorityStashedMessage(5)
 @SerialVersionUID(0L)
 case class FinishedProcessing(message: Any) extends PriorityStashedMessage(5)
 
+/**
+  * Handle the priority of messages not yet in the custom stash. As we won't always have a fast execution of messages
+  * (maybe someone decided to do an Await or Thread.sleep somewhere), we cannot really guarantee the priority of messages
+  * not yet received in the PriorityStashedActor. By implementing the UnboundedStablePriorityMailbox we solve this specific
+  * use case.
+  * You need to start the related actor extending PriorityStashedActor with "withMailbox(priority-stashed-actor)"
+  */
+final class PriorityStashedMailbox(settings: ActorSystem.Settings, config: Config) extends UnboundedStablePriorityMailbox(
+  PriorityGenerator {
+    case message: PriorityStashedMessage => message.priority
+    case _ => Int.MaxValue
+  }
+)
 
 /**
   * Implement an Actor with an home-made Stash with a (stable) priority queue. Its main goal is to provide a way to
