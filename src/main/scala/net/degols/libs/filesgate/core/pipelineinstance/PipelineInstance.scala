@@ -164,7 +164,9 @@ class PipelineInstance(filesgateConfiguration: FilesgateConfiguration, val pipel
 
     pipelineStep match {
       case Some(status) =>
-      case None => logger.error(s"Got an acknowledgement from $sender for an actor ref not linked to a known PipelineInstance (${pipelineSteps.keys.mkString(",")})...")
+        // TODO: We should handle the update of actors
+        logger.warn(s"We already have a status for the given pipeline step ${message.id}. Do nothing.")
+      case None =>
         if(message.pipelineInstanceId == id.get) {
           Try {
             context.watch(sender)
