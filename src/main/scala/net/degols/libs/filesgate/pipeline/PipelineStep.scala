@@ -2,10 +2,17 @@ package net.degols.libs.filesgate.pipeline
 
 import net.degols.libs.filesgate.core.EngineInternalMessage
 import net.degols.libs.filesgate.orm.FileMetadata
+import net.degols.libs.filesgate.utils.Step
 
 trait PipelineStep {
   val TYPE: String = "Unknown"
   val MANDATORY: Boolean = false
+
+  val DEFAULT_STEP_NAME: String = "Unknown"
+  /**
+    * Default step if it is mandatory for the pipeline, like the Download step
+    */
+  val defaultStep: Option[Step] = None
 }
 
 /**

@@ -178,9 +178,14 @@ class FilesgateConfiguration @Inject()(val defaultConfig: Config) {
         } else if (matchingSteps.nonEmpty) {
           matchingSteps.headOption
         } else if(stepType.MANDATORY) {
-          logger.error(s"Missing mandatory step for ${pipelineId}: ${stepType.TYPE}. Abort.")
-          throw new Exception("Invalid pipeline configuration")
-          None
+          if(stepType.TYPE == Download.TYPE && Download.defaultStep.isDefined) {
+            logger.debug("No specific step for the download phase, use the default one")
+            Download.defaultStep
+          } else {
+            logger.error(s"Missing mandatory step for ${pipelineId}: ${stepType.TYPE}. Abort.")
+            throw new Exception("Invalid pipeline configuration.")
+            None
+          }
         } else { // Normal behavior, nothing to add
           None
         }

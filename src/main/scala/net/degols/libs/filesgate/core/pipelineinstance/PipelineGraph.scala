@@ -164,7 +164,7 @@ class PipelineGraph(filesgateConfiguration: FilesgateConfiguration) {
   }
 
   /**
-    * Load any type of steps and merge flows of the same type.
+    * Load any type of steps and merge flows of the same type. If some steps are missing this is not a problem.
     * Only exception: source and sink
     */
   private def loadAnySteps(pipelineStepStatuses: List[PipelineStepStatus]): Flow[PipelineStepMessage, PipelineStepMessage, NotUsed] = {

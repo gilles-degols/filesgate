@@ -12,8 +12,9 @@ import net.degols.libs.election.{ConfigurationService, ElectionService}
 import net.degols.libs.filesgate.core.engine.{Engine, EngineActor}
 import net.degols.libs.filesgate.core.pipelineinstance.PipelineInstanceActor
 import net.degols.libs.filesgate.core.pipelinemanager.PipelineManagerActor
+import net.degols.libs.filesgate.pipeline.download.Download
 import net.degols.libs.filesgate.pipeline.{PipelineStepActor, PipelineStepService}
-import net.degols.libs.filesgate.utils.FilesgateConfiguration
+import net.degols.libs.filesgate.utils.{FilesgateConfiguration, Tools}
 import org.slf4j.LoggerFactory
 
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor}
@@ -28,7 +29,8 @@ import scala.concurrent.{ExecutionContext, ExecutionContextExecutor}
   */
 @Singleton
 abstract class EngineLeader @Inject()(engine: Engine,
-                               electionService: ElectionService,
+                                      tools: Tools,
+                                      electionService: ElectionService,
                                       configurationService: ConfigurationService,
                                       clusterConfiguration: ClusterConfiguration,
                                       filesgateConfiguration: FilesgateConfiguration,
@@ -54,8 +56,14 @@ abstract class EngineLeader @Inject()(engine: Engine,
         context.actorOf(Props.create(classOf[PipelineManagerActor], filesgateConfiguration), name = actorName)
       case PipelineInstanceActor.NAME =>
         context.actorOf(Props.create(classOf[PipelineInstanceActor], filesgateConfiguration), name = actorName)
+      case Download.DEFAULT_STEP_NAME =>
+        // We must create the default Download service
+        implicit val tool: Tools = tools
+        val service: PipelineStepService = new Download()
+        context.actorOf(Props.create(classOf[PipelineStepActor], ec, service).withMailbox("priority-stashed-actor"))
       case x =>
         // We try to find if the workertypeid is linked to a PipelineStep
+        logger.error(s"----> MUST START ${workerTypeId}")
         if(pipelineWorkerTypeInfo.exists(_.workerTypeId == workerTypeId)) {
           instantiatePipelineStep(workerTypeId, actorName)
         } else {

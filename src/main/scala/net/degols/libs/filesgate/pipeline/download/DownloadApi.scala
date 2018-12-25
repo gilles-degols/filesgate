@@ -1,10 +1,12 @@
 package net.degols.libs.filesgate.pipeline.download
 
 import net.degols.libs.cluster.Tools
+import net.degols.libs.cluster.messages.{BasicLoadBalancerType, ClusterInstance, Communication}
+import net.degols.libs.filesgate.core.EngineLeader
 import net.degols.libs.filesgate.orm.{FileMetadata, RawFileContent}
 import net.degols.libs.filesgate.pipeline.predownload.PreDownloadMessage
 import net.degols.libs.filesgate.pipeline.{AbortStep, PipelineStep, PipelineStepMessage, PipelineStepService}
-import net.degols.libs.filesgate.utils.Tools
+import net.degols.libs.filesgate.utils.{Step, Tools}
 import org.slf4j.{Logger, LoggerFactory}
 import play.api.libs.json.{JsObject, Json}
 
@@ -65,4 +67,9 @@ class Download(implicit val ec: ExecutionContext, tools: Tools) extends Download
 object Download extends PipelineStep{
   override val TYPE: String = "download"
   override val MANDATORY: Boolean = true
+  override val DEFAULT_STEP_NAME: String = "Core.Download"
+  override val defaultStep: Option[Step] = {
+    val fullStepName = Communication.fullActorName(EngineLeader.COMPONENT, EngineLeader.PACKAGE, DEFAULT_STEP_NAME)
+    Option(Step(TYPE, fullStepName, BasicLoadBalancerType(1, ClusterInstance)))
+  }
 }
