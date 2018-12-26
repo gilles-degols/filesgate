@@ -1,6 +1,7 @@
-package net.degols.libs.filesgate.pipeline.poststorage
+package net.degols.libs.filesgate.pipeline.postmetadata
 
 import net.degols.libs.filesgate.orm.{FileMetadata, RawFileContent}
+import net.degols.libs.filesgate.pipeline.metadata.MetadataMessage
 import net.degols.libs.filesgate.pipeline.storage.StorageMessage
 import net.degols.libs.filesgate.pipeline.{AbortStep, PipelineStep, PipelineStepMessage, PipelineStepService}
 import org.slf4j.{Logger, LoggerFactory}
@@ -11,41 +12,40 @@ import scala.concurrent.{ExecutionContext, Future}
 /**
   * Message sent through every PostStorageApi
   * @param fileMetadata
-  * @param rawFileContent
   * @param abortPostStorage if this value is received, we do not go any next post-storage stage
   */
 @SerialVersionUID(0L)
-case class PostStorageMessage(override val fileMetadata: FileMetadata, override val abort: Option[AbortStep], rawFileContent: Option[RawFileContent], downloadMetadata: Option[JsObject]) extends PipelineStepMessage(fileMetadata, abort)
+case class PostMetadataMessage(override val fileMetadata: FileMetadata, override val abort: Option[AbortStep], downloadMetadata: Option[JsObject]) extends PipelineStepMessage(fileMetadata, abort)
 
-object PostStorageMessage {
-  def from(storageMessage: StorageMessage): PostStorageMessage = PostStorageMessage(storageMessage.fileMetadata, storageMessage.abort, storageMessage.rawFileContent, storageMessage.downloadMetadata)
+object PostMetadataMessage {
+  def from(metadataMessage: MetadataMessage): PostMetadataMessage = PostMetadataMessage(metadataMessage.fileMetadata, metadataMessage.abort, metadataMessage.downloadMetadata)
 }
 
 /**
   * Every post-download process must extends this trait.
   */
-trait PostStorageApi extends PipelineStepService {
+trait PostMetadataApi extends PipelineStepService {
   /**
-    * @param postStorageMessage
+    * @param postMetadataMessage
     * @return
     */
-  def process(postStorageMessage: PostStorageMessage): Future[PostStorageMessage]
+  def process(postMetadataMessage: PostMetadataMessage): Future[PostMetadataMessage]
 
-  final override def process(message: Any): Any = process(message.asInstanceOf[PostStorageMessage])
+  final override def process(message: Any): Any = process(message.asInstanceOf[PostMetadataMessage])
 }
 
 
-class PostStorage(implicit val ec: ExecutionContext) extends PostStorageApi {
+class PostMetadata(implicit val ec: ExecutionContext) extends PostMetadataApi {
   private val logger: Logger = LoggerFactory.getLogger(getClass)
 
-  override def process(postStorageMessage: PostStorageMessage): Future[PostStorageMessage] = {
+  override def process(postMetadataMessage: PostMetadataMessage): Future[PostMetadataMessage] = {
     Future{
-      logger.debug(s"$id: processing $postStorageMessage")
-      postStorageMessage
+      logger.debug(s"$id: processing $postMetadataMessage")
+      postMetadataMessage
     }
   }
 }
 
-object PostStorage extends PipelineStep{
-  override val TYPE: String = "poststorage"
+object PostMetadata extends PipelineStep{
+  override val TYPE: String = "postmetadata"
 }

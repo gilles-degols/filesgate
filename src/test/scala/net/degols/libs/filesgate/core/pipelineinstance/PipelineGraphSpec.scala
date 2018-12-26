@@ -13,7 +13,7 @@ import net.degols.libs.filesgate.orm.FileMetadata
 import net.degols.libs.filesgate.pipeline.datasource.DataSource
 import net.degols.libs.filesgate.pipeline.download.Download
 import net.degols.libs.filesgate.pipeline.matcher.Matcher
-import net.degols.libs.filesgate.pipeline.poststorage.PostStorage
+import net.degols.libs.filesgate.pipeline.postmetadata.PostStorage
 import net.degols.libs.filesgate.pipeline.predownload.PreDownload
 import net.degols.libs.filesgate.pipeline.prestorage.PreStorage
 import net.degols.libs.filesgate.pipeline.storage.Storage

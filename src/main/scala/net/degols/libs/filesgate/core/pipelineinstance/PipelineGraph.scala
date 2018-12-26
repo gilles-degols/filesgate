@@ -13,8 +13,10 @@ import net.degols.libs.filesgate.pipeline.PipelineStepMessage
 import net.degols.libs.filesgate.pipeline.datasource.{DataSource, DataSourceSeed}
 import net.degols.libs.filesgate.pipeline.download.{Download, DownloadMessage}
 import net.degols.libs.filesgate.pipeline.matcher.{Matcher, MatcherMessage}
-import net.degols.libs.filesgate.pipeline.poststorage.{PostStorage, PostStorageMessage}
+import net.degols.libs.filesgate.pipeline.metadata.{Metadata, MetadataMessage}
+import net.degols.libs.filesgate.pipeline.postmetadata.{PostMetadata, PostMetadataMessage}
 import net.degols.libs.filesgate.pipeline.predownload.{PreDownload, PreDownloadMessage}
+import net.degols.libs.filesgate.pipeline.premetadata.{PreMetadata, PreMetadataMessage}
 import net.degols.libs.filesgate.pipeline.prestorage.{PreStorage, PreStorageMessage}
 import net.degols.libs.filesgate.pipeline.storage.{Storage, StorageMessage}
 import net.degols.libs.filesgate.utils.{FilesgateConfiguration, PipelineMetadata, Step}
@@ -53,7 +55,9 @@ class PipelineGraph(filesgateConfiguration: FilesgateConfiguration) {
     val download = loadDownloadSteps()
     val preStorage = loadPreStorageSteps()
     val storage = loadStorageSteps()
-    val postStorage = loadPostStorageSteps()
+    val preMetadata = loadPreMetadataSteps()
+    val metadata = loadMetadataSteps()
+    val postMetadata = loadPostMetadataSteps()
     val sink = loadSinkSteps()
 
     // Now that we have raw flows, we need to add intermediate steps to convert the data
@@ -64,7 +68,9 @@ class PipelineGraph(filesgateConfiguration: FilesgateConfiguration) {
       .via(download)
       .via(preStorage)
       .via(storage)
-      .via(postStorage)
+      .via(preMetadata)
+      .via(metadata)
+      .via(postMetadata)
       .runWith(sink)
   }
 
@@ -118,14 +124,32 @@ class PipelineGraph(filesgateConfiguration: FilesgateConfiguration) {
   def loadStorageSteps(): Flow[PipelineStepMessage, PipelineStepMessage, NotUsed] = {
     val stepWrappers = stepWrappersFromType(tpe = Storage.TYPE)
     val flowStep = loadAnySteps(stepWrappers.map(_._2))
-    flowStep.map(m => PostStorageMessage.from(m.asInstanceOf[StorageMessage]))
+    flowStep.map(m => PreMetadataMessage.from(m.asInstanceOf[StorageMessage]))
   }
 
   /**
-    * Load post-storage steps
+    * Load pre-metadata steps
     */
-  def loadPostStorageSteps(): Flow[PipelineStepMessage, PipelineStepMessage, NotUsed] = {
-    val stepWrappers = stepWrappersFromType(tpe = PostStorage.TYPE)
+  def loadPreMetadataSteps(): Flow[PipelineStepMessage, PipelineStepMessage, NotUsed] = {
+    val stepWrappers = stepWrappersFromType(tpe = PreMetadata.TYPE)
+    val flowStep = loadAnySteps(stepWrappers.map(_._2))
+    flowStep.map(m => MetadataMessage.from(m.asInstanceOf[PreMetadataMessage]))
+  }
+
+  /**
+    * Load metadata steps
+    */
+  def loadMetadataSteps(): Flow[PipelineStepMessage, PipelineStepMessage, NotUsed] = {
+    val stepWrappers = stepWrappersFromType(tpe = Metadata.TYPE)
+    val flowStep = loadAnySteps(stepWrappers.map(_._2))
+    flowStep.map(m => PostMetadataMessage.from(m.asInstanceOf[MetadataMessage]))
+  }
+
+  /**
+    * Load post-metadata steps
+    */
+  def loadPostMetadataSteps(): Flow[PipelineStepMessage, PipelineStepMessage, NotUsed] = {
+    val stepWrappers = stepWrappersFromType(tpe = PostMetadata.TYPE)
     val flowStep = loadAnySteps(stepWrappers.map(_._2))
     flowStep
   }

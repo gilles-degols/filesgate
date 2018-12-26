@@ -12,8 +12,10 @@ import net.degols.libs.filesgate.pipeline.PipelineStep
 import net.degols.libs.filesgate.pipeline.datasource.DataSource
 import net.degols.libs.filesgate.pipeline.download.Download
 import net.degols.libs.filesgate.pipeline.matcher.Matcher
-import net.degols.libs.filesgate.pipeline.poststorage.PostStorage
+import net.degols.libs.filesgate.pipeline.metadata.Metadata
+import net.degols.libs.filesgate.pipeline.postmetadata.{PostMetadata, PostStorage}
 import net.degols.libs.filesgate.pipeline.predownload.PreDownload
+import net.degols.libs.filesgate.pipeline.premetadata.PreMetadata
 import net.degols.libs.filesgate.pipeline.prestorage.PreStorage
 import net.degols.libs.filesgate.pipeline.storage.Storage
 import org.slf4j.LoggerFactory
@@ -212,5 +214,13 @@ object FilesgateConfiguration {
     * Only the "source" is mandatory and should be implemented by the developer (unless a mapping is given).
     * The "download" is a mandatory step, but does not need to be provided by the user.
     */
-  val PIPELINE_STEP_TYPES: List[PipelineStep] = List(DataSource, Matcher, PreDownload, Download, PreStorage, Storage, PostStorage)
+  val PIPELINE_STEP_TYPES: List[PipelineStep] = List(DataSource,
+                                                      Matcher,
+                                                      PreDownload,
+                                                      Download,
+                                                      PreStorage,
+                                                      Storage,
+                                                      PreMetadata,
+                                                      Metadata,
+                                                      PostMetadata)
 }

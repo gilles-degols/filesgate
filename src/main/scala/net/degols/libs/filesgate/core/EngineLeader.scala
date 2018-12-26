@@ -63,7 +63,6 @@ abstract class EngineLeader @Inject()(engine: Engine,
         context.actorOf(Props.create(classOf[PipelineStepActor], ec, service).withMailbox("priority-stashed-actor"))
       case x =>
         // We try to find if the workertypeid is linked to a PipelineStep
-        logger.error(s"----> MUST START ${workerTypeId}")
         if(pipelineWorkerTypeInfo.exists(_.workerTypeId == workerTypeId)) {
           instantiatePipelineStep(workerTypeId, actorName)
         } else {
