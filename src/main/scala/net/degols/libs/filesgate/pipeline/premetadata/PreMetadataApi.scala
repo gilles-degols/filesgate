@@ -1,6 +1,6 @@
 package net.degols.libs.filesgate.pipeline.premetadata
 
-import net.degols.libs.filesgate.orm.{FileMetadata, RawFileContent}
+import net.degols.libs.filesgate.orm.FileMetadata
 import net.degols.libs.filesgate.pipeline.{AbortStep, PipelineStep, PipelineStepMessage, PipelineStepService}
 import net.degols.libs.filesgate.pipeline.download.DownloadMessage
 import net.degols.libs.filesgate.pipeline.storage.StorageMessage

@@ -1,6 +1,6 @@
 package net.degols.libs.filesgate.storage
 
-import net.degols.libs.filesgate.orm.FileContent
+import net.degols.libs.filesgate.orm.{FileContent, FileMetadata}
 
 import scala.concurrent.Future
 import scala.util.Try
@@ -14,7 +14,7 @@ trait StorageContentApi {
     *                     can be important for performance in the underlying StorageSystem
     * @return
     */
-  def upsert(fileContent: FileContent, expectedSize: Option[Long] = None): Future[UpdateOperation]
+  def upsert(fileMetadata: FileMetadata, fileContent: FileContent): Future[UpdateOperation]
 
   /**
     * Return a FileContent. The first chunk will be loaded by default, other chunks will be loaded in memory when needed

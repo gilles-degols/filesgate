@@ -200,6 +200,10 @@ class FilesgateConfiguration @Inject()(val defaultConfig: Config) {
             logger.debug("No specific step for the download phase, use the default one.")
             if(isDownloadActivated) Download.defaultStep
             else None
+          } else if(stepType.TYPE == Storage.TYPE && Storage.defaultStep.isDefined) {
+            logger.debug("No specific step for the storage phase, use the default one.")
+            if(isStoreContentActivated) Storage.defaultStep
+            else None
           } else if(stepType.TYPE == Metadata.TYPE && Metadata.defaultStep.isDefined) {
             logger.debug("No specific step for the metadata phase, use the default one.")
             if(isStoreMetadataActivated) Metadata.defaultStep

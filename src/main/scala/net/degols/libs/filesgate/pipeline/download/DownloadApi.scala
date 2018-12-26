@@ -3,7 +3,7 @@ package net.degols.libs.filesgate.pipeline.download
 import net.degols.libs.cluster.Tools
 import net.degols.libs.cluster.messages.{BasicLoadBalancerType, ClusterInstance, Communication}
 import net.degols.libs.filesgate.core.EngineLeader
-import net.degols.libs.filesgate.orm.{FileMetadata, RawFileContent}
+import net.degols.libs.filesgate.orm.{FileContent, FileMetadata}
 import net.degols.libs.filesgate.pipeline.predownload.PreDownloadMessage
 import net.degols.libs.filesgate.pipeline.{AbortStep, PipelineStep, PipelineStepMessage, PipelineStepService}
 import net.degols.libs.filesgate.utils.{Step, Tools}
@@ -18,7 +18,7 @@ import scala.concurrent.{ExecutionContext, Future}
   * @param fileMetadata
   */
 @SerialVersionUID(0L)
-case class DownloadMessage(override val fileMetadata: FileMetadata, override val abort: Option[AbortStep], rawFileContent: Option[RawFileContent]) extends PipelineStepMessage(fileMetadata, abort)
+case class DownloadMessage(override val fileMetadata: FileMetadata, override val abort: Option[AbortStep], fileContent: Option[FileContent]) extends PipelineStepMessage(fileMetadata, abort)
 
 object DownloadMessage {
   def from(preDownloadMessage: PreDownloadMessage): DownloadMessage = DownloadMessage(preDownloadMessage.fileMetadata, preDownloadMessage.abort, None)
@@ -52,7 +52,7 @@ class Download(implicit val ec: ExecutionContext, tools: Tools) extends Download
 
     tools.downloadFileInMemory(downloadMessage.fileMetadata.url).map(rawDownloadFile => {
       val duration = rawDownloadFile.end.getTime - rawDownloadFile.start.getTime
-      val content = new RawFileContent()
+      val fileContent = new FileContent(downloadMessage.fileMetadata.id, rawDownloadFile.content.get)
       val downloadMetadata = Json.obj(
         "download_time" -> Json.obj("$date" -> rawDownloadFile.start.getTime),
         "download_duration_ms" -> duration,
@@ -60,7 +60,7 @@ class Download(implicit val ec: ExecutionContext, tools: Tools) extends Download
       )
       downloadMessage.fileMetadata.downloaded = true
       downloadMessage.fileMetadata.metadata = downloadMessage.fileMetadata.metadata ++ downloadMetadata
-      DownloadMessage(downloadMessage.fileMetadata, downloadMessage.abort, Option(content))
+      DownloadMessage(downloadMessage.fileMetadata, downloadMessage.abort, Option(fileContent))
     })
   }
 }
