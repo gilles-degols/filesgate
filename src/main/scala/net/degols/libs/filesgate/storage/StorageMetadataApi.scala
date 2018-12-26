@@ -6,13 +6,11 @@ import scala.concurrent.Future
 import scala.util.Try
 
 trait StorageMetadataApi {
-  def update(fileMetadata: FileMetadata): Future[Try[UpdateOperation]]
+  def update(fileMetadata: FileMetadata): Future[UpdateOperation]
 
-  def save(fileMetadata: FileMetadata): Future[Try[SaveOperation]]
+  def save(fileMetadata: FileMetadata): Future[SaveOperation]
 
-  def get(id: String): Future[Try[FileMetadata]]
+  def get(id: String): Future[FileMetadata]
 
-  def delete(id: String): Future[Try[Boolean]]
-
-  def listToRecover(priority: Int, quantity: Int): Future[Try[List[FileMetadata]]]
+  def delete(id: String): Future[Boolean]
 }

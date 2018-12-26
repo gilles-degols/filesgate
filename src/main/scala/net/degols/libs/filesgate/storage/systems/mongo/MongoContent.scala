@@ -1,13 +1,18 @@
 package net.degols.libs.filesgate.storage.systems.mongo
 
+import java.io.{BufferedInputStream, ByteArrayInputStream, InputStream}
+
 import com.google.inject.Inject
 import javax.inject.Singleton
 import net.degols.libs.filesgate.orm.FileContent
-import net.degols.libs.filesgate.storage.StorageContentApi
-import net.degols.libs.filesgate.utils.{FilesgateConfiguration, Tools}
+import net.degols.libs.filesgate.storage.{SaveOperation, StorageContentApi}
+import net.degols.libs.filesgate.utils.{FileNotFound, FilesgateConfiguration, Tools}
+import org.bson.Document
 import org.slf4j.{Logger, LoggerFactory}
+import play.api.libs.json.Json
 
-import scala.concurrent.ExecutionContextExecutor
+import scala.concurrent.{ExecutionContextExecutor, Future}
+import scala.util.{Failure, Success, Try}
 
 
 /**
@@ -16,6 +21,9 @@ import scala.concurrent.ExecutionContextExecutor
   */
 @Singleton
 class MongoContent @Inject()(conf: FilesgateConfiguration, tools: Tools) extends StorageContentApi {
+  val DATABASE_NAME: String = "filesgate.content"
+  val COLLECTION_NAME: String = "data"
+
   private val logger: Logger = LoggerFactory.getLogger(getClass)
   implicit val executionContext: ExecutionContextExecutor = tools.executionContext
   private val mongoConfiguration = MongoConfiguration(
@@ -27,9 +35,44 @@ class MongoContent @Inject()(conf: FilesgateConfiguration, tools: Tools) extends
     */
   private val mongo: MongoUtils = new MongoUtils(conf, tools, mongoConfiguration)
 
-  override def save(fileContent: FileContent, expectedSize: Option[Long]) = ???
+  override def save(fileContent: FileContent, expectedSize: Option[Long]): Future[SaveOperation] = {
+    Future{
+      val baseObj = Json.obj(
+        "_id" -> Json.obj("$oid" -> fileContent.id.substring(0,12)),
+        "id" -> Json.obj("id" -> fileContent.id),
+        "meta" -> fileContent.meta
+      )
+      val doc = Document.parse(baseObj.toString)
+                        .append("content", fileContent.raw)
+      mongo.insertMany(DATABASE_NAME, COLLECTION_NAME, List(doc))
+      SaveOperation()
+    }
+  }
 
-  override def get(id: String) = ???
+  override def get(id: String): Future[FileContent] = {
+    Future {
+      val query = Json.obj(
+        "_id" -> Json.obj("$oid" -> id.substring(0,12)),
+        "id" -> id
+      )
+      mongo.findOne(DATABASE_NAME, COLLECTION_NAME, query, SortAsc()) match {
+        case Some(res) =>
+          val bytes: Array[Byte] = res.get("content", classOf[org.bson.types.Binary]).getData
+          val meta = mongo.toJson(res.get("meta").asInstanceOf[Document])
+          new FileContent(id, bytes, meta)
+        case None =>
+          throw new FileNotFound(s"File not found: $id")
+      }
+    }
+  }
 
-  override def delete(id: String) = ???
+  override def delete(id: String): Future[Boolean] = {
+    Future {
+      val query = Json.obj(
+        "_id" -> Json.obj("$oid" -> id.substring(0,12)),
+        "id" -> id
+      )
+      mongo.deleteMany(DATABASE_NAME, COLLECTION_NAME, query).wasAcknowledged()
+    }
+  }
 }

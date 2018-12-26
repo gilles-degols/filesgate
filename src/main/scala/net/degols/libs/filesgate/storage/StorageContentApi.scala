@@ -14,17 +14,17 @@ trait StorageContentApi {
     *                     can be important for performance in the underlying StorageSystem
     * @return
     */
-  def save(fileContent: FileContent, expectedSize: Option[Long] = None): Future[Try[SaveOperation]]
+  def save(fileContent: FileContent, expectedSize: Option[Long] = None): Future[SaveOperation]
 
   /**
     * Return a FileContent. The first chunk will be loaded by default, other chunks will be loaded in memory when needed
     * @param id
     * @return
     */
-  def get(id: String): Future[Try[FileContent]]
+  def get(id: String): Future[FileContent]
 
   /**
     * Delete a FileContent
     */
-  def delete(id: String): Future[Try[Boolean]]
+  def delete(id: String): Future[Boolean]
 }

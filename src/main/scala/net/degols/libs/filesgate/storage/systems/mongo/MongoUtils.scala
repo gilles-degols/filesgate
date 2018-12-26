@@ -2,6 +2,7 @@ package net.degols.libs.filesgate.storage.systems.mongo
 
 import com.mongodb.client._
 import com.mongodb.client.model.{CreateCollectionOptions, IndexOptions, InsertManyOptions}
+import com.mongodb.client.result.{DeleteResult, UpdateResult}
 import com.mongodb.{MongoBulkWriteException, client}
 import net.degols.libs.filesgate.utils.{FilesgateConfiguration, Tools}
 import org.bson.Document
@@ -10,6 +11,7 @@ import org.slf4j.{Logger, LoggerFactory}
 import play.api.libs.json.{JsObject, Json}
 
 import scala.collection.JavaConverters._
+import scala.collection.mutable.ListBuffer
 
 trait SortType {
   def json: JsObject
@@ -48,12 +50,24 @@ class MongoUtils(conf: FilesgateConfiguration, tools: Tools, mongoConfiguration:
     else getCollection(db, coll).find(toDoc(query)).skip(skip).limit(limit).projection(toDoc(projection))
   }
 
-  def findOne(db: String, coll: String, query: JsObject, sortType: SortType): Option[JsObject] = {
-    toJsonList(find(db, coll, query, skip = 0, limit = 1, projection = Json.obj(), sortType = sortType).iterator()).headOption
+  def findOne(db: String, coll: String, query: JsObject, sortType: SortType): Option[Document] = {
+   toDocList(find(db, coll, query, skip = 0, limit = 1, projection = Json.obj(), sortType = sortType).iterator()).headOption
+  }
+
+  def updateMany(db: String, coll: String, query: JsObject, update: JsObject): UpdateResult = {
+    getCollection(db, coll).updateMany(toDoc(query), toDoc(update))
+  }
+
+  def updateOne(db: String, coll: String, query: JsObject, update: JsObject): UpdateResult = {
+    getCollection(db, coll).updateOne(toDoc(query), toDoc(update))
   }
 
   def first(db: String, coll: String): Option[JsObject] = {
     toJsonList(find(db, coll, Json.obj(), skip = 0, limit = 1, projection = Json.obj(), sortType = SortAsc()).iterator()).headOption
+  }
+
+  def deleteMany(db: String, coll: String, query: JsObject): DeleteResult = {
+    getCollection(db, coll).deleteMany(toDoc(query))
   }
 
   def listDatabases: List[String] = {
@@ -132,6 +146,14 @@ class MongoUtils(conf: FilesgateConfiguration, tools: Tools, mongoConfiguration:
     var results = List.empty[JsObject]
     while(iterator.hasNext) {
       results = List(toJson(iterator.next())) ::: results
+    }
+    results
+  }
+
+  def toDocList(iterator: MongoCursor[Document]): ListBuffer[Document] = {
+    val results = ListBuffer[Document]()
+    while(iterator.hasNext) {
+      results.append(iterator.next())
     }
     results
   }
