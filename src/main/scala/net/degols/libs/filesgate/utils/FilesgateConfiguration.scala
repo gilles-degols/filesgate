@@ -96,6 +96,22 @@ class FilesgateConfiguration @Inject()(val defaultConfig: Config) {
   val startWorkerTimeout: FiniteDuration = config.getInt("cluster.start-worker-timeout-ms") millis
 
   /**
+    * Is the default metadata storage activated?
+    */
+  val isStoreMetadataActivated: Boolean = config.getBoolean("filesgate.storage.metadata.activate")
+
+  /**
+    * Is the default content storage activated ?
+    */
+  val isStoreContentActivated: Boolean = config.getBoolean("filesgate.storage.content.activate")
+
+  /**
+    * Is the default download activated ?
+    */
+  val isDownloadActivated: Boolean = config.getBoolean("filesgate.download.activate")
+
+
+  /**
     * It's difficult to get a remote actor path locally. Because of that, we still want to know the current hostname + port
     */
   val akkaLocalHostname: String = config.getString("akka.remote.netty.tcp.hostname")
@@ -182,10 +198,12 @@ class FilesgateConfiguration @Inject()(val defaultConfig: Config) {
         } else if(stepType.MANDATORY) {
           if(stepType.TYPE == Download.TYPE && Download.defaultStep.isDefined) {
             logger.debug("No specific step for the download phase, use the default one.")
-            Download.defaultStep
+            if(isDownloadActivated) Download.defaultStep
+            else None
           } else if(stepType.TYPE == Metadata.TYPE && Metadata.defaultStep.isDefined) {
             logger.debug("No specific step for the metadata phase, use the default one.")
-            Metadata.defaultStep
+            if(isStoreMetadataActivated) Metadata.defaultStep
+            else None
           } else {
             logger.error(s"Missing mandatory step for ${pipelineId}: ${stepType.TYPE}. Abort.")
             throw new Exception("Invalid pipeline configuration.")
