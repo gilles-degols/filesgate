@@ -13,8 +13,10 @@ import net.degols.libs.filesgate.orm.FileMetadata
 import net.degols.libs.filesgate.pipeline.datasource.DataSource
 import net.degols.libs.filesgate.pipeline.download.Download
 import net.degols.libs.filesgate.pipeline.matcher.Matcher
-import net.degols.libs.filesgate.pipeline.postmetadata.PostStorage
+import net.degols.libs.filesgate.pipeline.metadata.Metadata
+import net.degols.libs.filesgate.pipeline.postmetadata.PostMetadata
 import net.degols.libs.filesgate.pipeline.predownload.PreDownload
+import net.degols.libs.filesgate.pipeline.premetadata.PreMetadata
 import net.degols.libs.filesgate.pipeline.prestorage.PreStorage
 import net.degols.libs.filesgate.pipeline.storage.Storage
 import net.degols.libs.filesgate.utils.{FilesgateConfiguration, PipelineMetadata, Step}
@@ -38,7 +40,9 @@ class PipelineGraphSpec extends TestKit(ActorSystem("MySpec")) with MockitoSugar
     Step(Download.TYPE, "Component:Package:test.download", BasicLoadBalancerType(1, ClusterInstance)),
     Step(PreStorage.TYPE, "Component:Package:test.prestorage", BasicLoadBalancerType(1, ClusterInstance)),
     Step(Storage.TYPE, "Component:Package:test.storage", BasicLoadBalancerType(1, ClusterInstance)),
-    Step(PostStorage.TYPE, "Component:Package:test.poststorage", BasicLoadBalancerType(1, ClusterInstance))
+    Step(PreMetadata.TYPE, "Component:Package:test.premetadata", BasicLoadBalancerType(1, ClusterInstance)),
+    Step(Metadata.TYPE, "Component:Package:test.metadata", BasicLoadBalancerType(1, ClusterInstance)),
+    Step(PostMetadata.TYPE, "Component:Package:test.postmetadata", BasicLoadBalancerType(1, ClusterInstance))
   )
   var pipelineMetadata: PipelineMetadata = PipelineMetadata("test", steps, 1)
   var pipelineSteps: Map[String, PipelineStepStatus] = constructPipelineSteps(steps)

@@ -1,7 +1,7 @@
 package net.degols.libs.filesgate.storage.systems.mongo
 
 import com.mongodb.client._
-import com.mongodb.client.model.{CreateCollectionOptions, IndexOptions, InsertManyOptions}
+import com.mongodb.client.model.{CreateCollectionOptions, IndexOptions, InsertManyOptions, UpdateOptions}
 import com.mongodb.client.result.{DeleteResult, UpdateResult}
 import com.mongodb.{MongoBulkWriteException, client}
 import net.degols.libs.filesgate.utils.{FilesgateConfiguration, Tools}
@@ -54,12 +54,16 @@ class MongoUtils(conf: FilesgateConfiguration, tools: Tools, mongoConfiguration:
    toDocList(find(db, coll, query, skip = 0, limit = 1, projection = Json.obj(), sortType = sortType).iterator()).headOption
   }
 
-  def updateMany(db: String, coll: String, query: JsObject, update: JsObject): UpdateResult = {
-    getCollection(db, coll).updateMany(toDoc(query), toDoc(update))
+  def updateMany(db: String, coll: String, query: JsObject, update: JsObject, upsert: Boolean = false): UpdateResult = {
+    getCollection(db, coll).updateMany(toDoc(query), toDoc(update),new UpdateOptions().upsert(upsert))
   }
 
-  def updateOne(db: String, coll: String, query: JsObject, update: JsObject): UpdateResult = {
-    getCollection(db, coll).updateOne(toDoc(query), toDoc(update))
+  def updateOneDoc(db: String, coll: String, query: JsObject, update: Document, upsert: Boolean = false): UpdateResult = {
+    getCollection(db, coll).updateMany(toDoc(query), update, new UpdateOptions().upsert(upsert))
+  }
+
+  def updateOne(db: String, coll: String, query: JsObject, update: JsObject, upsert: Boolean = false): UpdateResult = {
+    getCollection(db, coll).updateOne(toDoc(query), toDoc(update), new UpdateOptions().upsert(upsert))
   }
 
   def first(db: String, coll: String): Option[JsObject] = {

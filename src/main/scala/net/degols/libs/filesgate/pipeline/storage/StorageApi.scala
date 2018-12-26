@@ -9,10 +9,10 @@ import play.api.libs.json.JsObject
 import scala.concurrent.{ExecutionContext, Future}
 
 @SerialVersionUID(0L)
-case class StorageMessage(override val fileMetadata: FileMetadata, override val abort: Option[AbortStep], rawFileContent: Option[RawFileContent], downloadMetadata: Option[JsObject]) extends PipelineStepMessage(fileMetadata, abort)
+case class StorageMessage(override val fileMetadata: FileMetadata, override val abort: Option[AbortStep], rawFileContent: Option[RawFileContent]) extends PipelineStepMessage(fileMetadata, abort)
 
 object StorageMessage {
-  def from(preStorageMessage: PreStorageMessage): StorageMessage = StorageMessage(preStorageMessage.fileMetadata, preStorageMessage.abort, preStorageMessage.rawFileContent, preStorageMessage.downloadMetadata)
+  def from(preStorageMessage: PreStorageMessage): StorageMessage = StorageMessage(preStorageMessage.fileMetadata, preStorageMessage.abort, preStorageMessage.rawFileContent)
 }
 
 

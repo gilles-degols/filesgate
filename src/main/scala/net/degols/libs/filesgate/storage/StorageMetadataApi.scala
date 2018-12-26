@@ -6,9 +6,7 @@ import scala.concurrent.Future
 import scala.util.Try
 
 trait StorageMetadataApi {
-  def update(fileMetadata: FileMetadata): Future[UpdateOperation]
-
-  def save(fileMetadata: FileMetadata): Future[SaveOperation]
+  def upsert(fileMetadata: FileMetadata): Future[UpdateOperation]
 
   def get(id: String): Future[FileMetadata]
 

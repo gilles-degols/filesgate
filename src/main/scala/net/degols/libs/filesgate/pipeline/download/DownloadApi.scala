@@ -18,10 +18,10 @@ import scala.concurrent.{ExecutionContext, Future}
   * @param fileMetadata
   */
 @SerialVersionUID(0L)
-case class DownloadMessage(override val fileMetadata: FileMetadata, override val abort: Option[AbortStep], rawFileContent: Option[RawFileContent], downloadMetadata: Option[JsObject]) extends PipelineStepMessage(fileMetadata, abort)
+case class DownloadMessage(override val fileMetadata: FileMetadata, override val abort: Option[AbortStep], rawFileContent: Option[RawFileContent]) extends PipelineStepMessage(fileMetadata, abort)
 
 object DownloadMessage {
-  def from(preDownloadMessage: PreDownloadMessage): DownloadMessage = DownloadMessage(preDownloadMessage.fileMetadata, preDownloadMessage.abort, None, None)
+  def from(preDownloadMessage: PreDownloadMessage): DownloadMessage = DownloadMessage(preDownloadMessage.fileMetadata, preDownloadMessage.abort, None)
 }
 
 /**
@@ -54,11 +54,13 @@ class Download(implicit val ec: ExecutionContext, tools: Tools) extends Download
       val duration = rawDownloadFile.end.getTime - rawDownloadFile.start.getTime
       val content = new RawFileContent()
       val downloadMetadata = Json.obj(
-        "download_start" -> Json.obj("$date" -> rawDownloadFile.start.getTime),
+        "download_time" -> Json.obj("$date" -> rawDownloadFile.start.getTime),
         "download_duration_ms" -> duration,
-        "size_b" -> rawDownloadFile.size
+        "size_b" -> Json.obj("$numberLong" -> rawDownloadFile.size)
       )
-      DownloadMessage(downloadMessage.fileMetadata, downloadMessage.abort, Option(content), Option(downloadMetadata))
+      downloadMessage.fileMetadata.downloaded = true
+      downloadMessage.fileMetadata.metadata = downloadMessage.fileMetadata.metadata ++ downloadMetadata
+      DownloadMessage(downloadMessage.fileMetadata, downloadMessage.abort, Option(content))
     })
   }
 }

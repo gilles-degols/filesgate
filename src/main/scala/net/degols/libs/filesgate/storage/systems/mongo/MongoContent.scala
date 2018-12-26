@@ -5,7 +5,7 @@ import java.io.{BufferedInputStream, ByteArrayInputStream, InputStream}
 import com.google.inject.Inject
 import javax.inject.Singleton
 import net.degols.libs.filesgate.orm.FileContent
-import net.degols.libs.filesgate.storage.{SaveOperation, StorageContentApi}
+import net.degols.libs.filesgate.storage.{SaveOperation, StorageContentApi, UpdateOperation}
 import net.degols.libs.filesgate.utils.{FileNotFound, FilesgateConfiguration, Tools}
 import org.bson.Document
 import org.slf4j.{Logger, LoggerFactory}
@@ -21,7 +21,7 @@ import scala.util.{Failure, Success, Try}
   */
 @Singleton
 class MongoContent @Inject()(conf: FilesgateConfiguration, tools: Tools) extends StorageContentApi {
-  val DATABASE_NAME: String = "filesgate.content"
+  val DATABASE_NAME: String = "filesgateContent"
   val COLLECTION_NAME: String = "data"
 
   private val logger: Logger = LoggerFactory.getLogger(getClass)
@@ -35,24 +35,37 @@ class MongoContent @Inject()(conf: FilesgateConfiguration, tools: Tools) extends
     */
   private val mongo: MongoUtils = new MongoUtils(conf, tools, mongoConfiguration)
 
-  override def save(fileContent: FileContent, expectedSize: Option[Long]): Future[SaveOperation] = {
+  override def upsert(fileContent: FileContent, expectedSize: Option[Long]): Future[UpdateOperation] = {
     Future{
-      val baseObj = Json.obj(
-        "_id" -> Json.obj("$oid" -> fileContent.id.substring(0,12)),
-        "id" -> Json.obj("id" -> fileContent.id),
-        "meta" -> fileContent.meta
+      val query = Json.obj(
+        "_id" -> Json.obj("$oid" -> fileContent.id.substring(0,24)),
+        "id" -> Json.obj("id" -> fileContent.id)
       )
-      val doc = Document.parse(baseObj.toString)
-                        .append("content", fileContent.raw)
-      mongo.insertMany(DATABASE_NAME, COLLECTION_NAME, List(doc))
-      SaveOperation()
+      val update = Json.obj(
+        "$set" -> Json.obj("meta" -> fileContent.meta),
+        "$setOnInsert" -> Json.obj(
+          "_id" -> Json.obj("$oid" -> fileContent.id.substring(0,24)),
+          "id" -> Json.obj("id" -> fileContent.id)
+        )
+      )
+      val doc = Document.parse(update.toString)
+      val set = doc.get("$set").asInstanceOf[Document]
+      set.append("content", fileContent.raw)
+      val setOnInsert = doc.get("$setOnInsert").asInstanceOf[Document]
+      setOnInsert.append("content", fileContent.raw)
+
+      doc.append("$set", set)
+      doc.append("$setOnInsert", setOnInsert)
+
+      mongo.updateOneDoc(DATABASE_NAME, COLLECTION_NAME, query, doc, true)
+      UpdateOperation()
     }
   }
 
   override def get(id: String): Future[FileContent] = {
     Future {
       val query = Json.obj(
-        "_id" -> Json.obj("$oid" -> id.substring(0,12)),
+        "_id" -> Json.obj("$oid" -> id.substring(0,24)),
         "id" -> id
       )
       mongo.findOne(DATABASE_NAME, COLLECTION_NAME, query, SortAsc()) match {
@@ -69,7 +82,7 @@ class MongoContent @Inject()(conf: FilesgateConfiguration, tools: Tools) extends
   override def delete(id: String): Future[Boolean] = {
     Future {
       val query = Json.obj(
-        "_id" -> Json.obj("$oid" -> id.substring(0,12)),
+        "_id" -> Json.obj("$oid" -> id.substring(0,24)),
         "id" -> id
       )
       mongo.deleteMany(DATABASE_NAME, COLLECTION_NAME, query).wasAcknowledged()

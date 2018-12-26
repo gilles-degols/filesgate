@@ -15,10 +15,10 @@ import scala.concurrent.{ExecutionContext, Future}
   * @param abortPostStorage if this value is received, we do not go any next post-storage stage
   */
 @SerialVersionUID(0L)
-case class PostMetadataMessage(override val fileMetadata: FileMetadata, override val abort: Option[AbortStep], downloadMetadata: Option[JsObject]) extends PipelineStepMessage(fileMetadata, abort)
+case class PostMetadataMessage(override val fileMetadata: FileMetadata, override val abort: Option[AbortStep]) extends PipelineStepMessage(fileMetadata, abort)
 
 object PostMetadataMessage {
-  def from(metadataMessage: MetadataMessage): PostMetadataMessage = PostMetadataMessage(metadataMessage.fileMetadata, metadataMessage.abort, metadataMessage.downloadMetadata)
+  def from(metadataMessage: MetadataMessage): PostMetadataMessage = PostMetadataMessage(metadataMessage.fileMetadata, metadataMessage.abort)
 }
 
 /**

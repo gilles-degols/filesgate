@@ -13,7 +13,7 @@ import net.degols.libs.filesgate.pipeline.datasource.DataSource
 import net.degols.libs.filesgate.pipeline.download.Download
 import net.degols.libs.filesgate.pipeline.matcher.Matcher
 import net.degols.libs.filesgate.pipeline.metadata.Metadata
-import net.degols.libs.filesgate.pipeline.postmetadata.{PostMetadata, PostStorage}
+import net.degols.libs.filesgate.pipeline.postmetadata.PostMetadata
 import net.degols.libs.filesgate.pipeline.predownload.PreDownload
 import net.degols.libs.filesgate.pipeline.premetadata.PreMetadata
 import net.degols.libs.filesgate.pipeline.prestorage.PreStorage
@@ -181,8 +181,11 @@ class FilesgateConfiguration @Inject()(val defaultConfig: Config) {
           matchingSteps.headOption
         } else if(stepType.MANDATORY) {
           if(stepType.TYPE == Download.TYPE && Download.defaultStep.isDefined) {
-            logger.debug("No specific step for the download phase, use the default one")
+            logger.debug("No specific step for the download phase, use the default one.")
             Download.defaultStep
+          } else if(stepType.TYPE == Metadata.TYPE && Metadata.defaultStep.isDefined) {
+            logger.debug("No specific step for the metadata phase, use the default one.")
+            Metadata.defaultStep
           } else {
             logger.error(s"Missing mandatory step for ${pipelineId}: ${stepType.TYPE}. Abort.")
             throw new Exception("Invalid pipeline configuration.")

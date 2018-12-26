@@ -14,7 +14,7 @@ trait StorageContentApi {
     *                     can be important for performance in the underlying StorageSystem
     * @return
     */
-  def save(fileContent: FileContent, expectedSize: Option[Long] = None): Future[SaveOperation]
+  def upsert(fileContent: FileContent, expectedSize: Option[Long] = None): Future[UpdateOperation]
 
   /**
     * Return a FileContent. The first chunk will be loaded by default, other chunks will be loaded in memory when needed

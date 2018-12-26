@@ -16,10 +16,10 @@ import scala.concurrent.{ExecutionContext, Future}
   * @param abortStorage if this value is received, we do not go any next pre-storage stage
   */
 @SerialVersionUID(0L)
-case class PreMetadataMessage(override val fileMetadata: FileMetadata, override val abort: Option[AbortStep], downloadMetadata: Option[JsObject]) extends PipelineStepMessage(fileMetadata, abort)
+case class PreMetadataMessage(override val fileMetadata: FileMetadata, override val abort: Option[AbortStep]) extends PipelineStepMessage(fileMetadata, abort)
 
 object PreMetadataMessage {
-  def from(storageMessage: StorageMessage): PreMetadataMessage = PreMetadataMessage(storageMessage.fileMetadata, storageMessage.abort, storageMessage.downloadMetadata)
+  def from(storageMessage: StorageMessage): PreMetadataMessage = PreMetadataMessage(storageMessage.fileMetadata, storageMessage.abort)
 }
 
 /**
