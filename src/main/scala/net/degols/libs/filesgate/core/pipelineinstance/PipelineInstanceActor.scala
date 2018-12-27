@@ -4,6 +4,7 @@ import akka.actor.{Actor, ActorRef, Kill, Terminated}
 import net.degols.libs.filesgate.core._
 import net.degols.libs.filesgate.utils.FilesgateConfiguration
 import org.slf4j.{Logger, LoggerFactory}
+import play.api.libs.concurrent.Futures
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
@@ -14,7 +15,6 @@ case object CheckPipelineStepState
   */
 class PipelineInstanceActor(filesgateConfiguration: FilesgateConfiguration) extends Actor{
   private val logger: Logger = LoggerFactory.getLogger(getClass)
-
   var pipelineManagerActor: Option[ActorRef] = None
 
   /**

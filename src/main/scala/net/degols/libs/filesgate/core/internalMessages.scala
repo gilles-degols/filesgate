@@ -1,7 +1,7 @@
 package net.degols.libs.filesgate.core
 
 import akka.actor.ActorRef
-import net.degols.libs.filesgate.utils.{PriorityStashedMessage, UnknownPipelineStep}
+import net.degols.libs.filesgate.utils.{PriorityStashedMessage, Step, UnknownPipelineStep}
 
 /**
   * Every message sent to PipelineStepActor must extend this one. Any priority in [0;10[ is reserved for internal use of
@@ -61,7 +61,7 @@ case class PipelineInstanceWorkingOn(id: String, pipelineManagerId: String) exte
   * Demand from a PipelineInstanceActor to know if it agrees to work for a given PipelineInstanceId
   * The Name parameter is the full name of the actor
   */
-case class PipelineStepToHandle(id: String, pipelineInstanceId: String, pipelineManagerId: String, name: String) extends EngineInternalMessage
+case class PipelineStepToHandle(id: String, pipelineInstanceId: String, pipelineManagerId: String, step: Step) extends EngineInternalMessage
 
 /**
   * Reply by a PipelineStep to the EngineActor saying on which id it is working (based on the PipelineInstanceToHandle
@@ -69,7 +69,7 @@ case class PipelineStepToHandle(id: String, pipelineInstanceId: String, pipeline
   * It's acting as acknowledgement or as a refusal to work on the given task
   * @param id
   */
-case class PipelineStepWorkingOn(id: String, pipelineInstanceId: String, pipelineManagerId: String, name: String) extends EngineInternalMessage
+case class PipelineStepWorkingOn(id: String, pipelineInstanceId: String, pipelineManagerId: String, step: Step) extends EngineInternalMessage
 
 /**
   * Information sent by a PipelineManager to the EngineActor to give some status about itself
@@ -109,10 +109,10 @@ case object PipelineStepWaiting extends PipelineStepState
 case object PipelineStepRunning extends PipelineStepState
 
 /**
-  * @param fullName
+  * @param step
   * @param pipelineInstances the key is the PipelineInstanceId
   */
-case class PipelineStepStatus(fullName: String, var pipelineInstanceId: String, var pipelineStepState: PipelineStepState = PipelineStepUnknown) extends EngineInternalMessage {
+case class PipelineStepStatus(step: Step, var pipelineInstanceId: String, var pipelineStepState: PipelineStepState = PipelineStepUnknown) extends EngineInternalMessage {
   private var _actorRef: Option[ActorRef] = None
   def setActorRef(actorRef: ActorRef): Unit = _actorRef = Option(actorRef)
   def removeActorRef(): Unit = _actorRef = None

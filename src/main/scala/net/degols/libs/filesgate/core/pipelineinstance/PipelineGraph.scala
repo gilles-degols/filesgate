@@ -7,6 +7,7 @@ import akka.stream.scaladsl.{Flow, Sink, Source}
 import akka.util.Timeout
 import akka.{Done, NotUsed}
 import net.degols.libs.cluster.messages.Communication
+import net.degols.libs.filesgate.Tools
 import net.degols.libs.filesgate.core.PipelineStepStatus
 import net.degols.libs.filesgate.orm.FileMetadata
 import net.degols.libs.filesgate.pipeline.PipelineStepMessage
@@ -21,11 +22,13 @@ import net.degols.libs.filesgate.pipeline.prestorage.{PreStorage, PreStorageMess
 import net.degols.libs.filesgate.pipeline.storage.{Storage, StorageMessage}
 import net.degols.libs.filesgate.utils.{FilesgateConfiguration, PipelineMetadata, Step}
 import org.slf4j.{Logger, LoggerFactory}
+import play.api.libs.concurrent.Futures
+import play.api.libs.concurrent.Futures._
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.concurrent.duration._
-import scala.util.{Failure, Success}
+import scala.util.{Failure, Success, Try}
 
 /**
   * In charge of constructing the graph to fetch the data until writing them. Only create the graph, does not run it.
@@ -34,7 +37,7 @@ class PipelineGraph(filesgateConfiguration: FilesgateConfiguration) {
   implicit var context: ActorContext = _
   private val logger: Logger = LoggerFactory.getLogger(getClass)
 
-  implicit val timeout = Timeout(120 seconds)
+  implicit val futures: Futures = filesgateConfiguration.futures
 
   var pipelineMetadata: PipelineMetadata = _
   var stepStatus: List[PipelineStepStatus] = _
@@ -72,6 +75,10 @@ class PipelineGraph(filesgateConfiguration: FilesgateConfiguration) {
       .via(metadata)
       .via(postMetadata)
       .runWith(sink)
+      .onComplete{
+        case Success(res) => logger.error("The stream has just been closed without any failure. A good stream is not supposed to finish at all.")
+        case Failure(err) => logger.error(s"The stream has failed with an exception: ${net.degols.libs.cluster.Tools.formatStacktrace(err)}")
+      }
   }
 
   /**
@@ -193,9 +200,12 @@ class PipelineGraph(filesgateConfiguration: FilesgateConfiguration) {
     */
   private def loadAnySteps(pipelineStepStatuses: List[PipelineStepStatus]): Flow[PipelineStepMessage, PipelineStepMessage, NotUsed] = {
     pipelineStepStatuses.map(pipelineStepStatus => {
-    Flow[PipelineStepMessage].mapAsync(50)(m => {
+      // timeout for the Ask pattern
+      implicit val timeout = Timeout(pipelineStepStatus.step.processingTimeout._1 millis)
+
+      Flow[PipelineStepMessage].mapAsync(50)(m => {
       logger.debug(s"Pipeline graph step: send message $m")
-        (pipelineStepStatus.actorRef.get ? m)
+        (pipelineStepStatus.actorRef.get ? m).withTimeout(timeout.duration._1 millis)
           .map(_.asInstanceOf[PipelineStepMessage])
       }).filter(_.abort.isEmpty)
     }).foldLeft(Flow[PipelineStepMessage])(_.via(_))
@@ -206,7 +216,7 @@ class PipelineGraph(filesgateConfiguration: FilesgateConfiguration) {
     */
   def stepWrappersFromType(tpe: String): List[(Step, PipelineStepStatus)] = {
     pipelineMetadata.steps.filter(_.tpe == tpe).flatMap(step => {
-      stepStatus.find(_.fullName == step.name) match {
+      stepStatus.find(_.step.name == step.name) match {
         case Some(stat) =>
           Option((step, stat))
         case None =>

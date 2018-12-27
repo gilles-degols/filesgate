@@ -55,7 +55,6 @@ class MongoContent @Inject()(conf: FilesgateConfiguration, tools: Tools) extends
       subDoc.append("content", fileContent.raw)
       val doc = new Document()
       doc.append("$set", subDoc)
-
       mongo.updateOneDoc(DATABASE_NAME, COLLECTION_NAME, query, doc, true)
       UpdateOperation()
     }

@@ -72,6 +72,7 @@ object Download extends PipelineStep{
   override val DEFAULT_STEP_NAME: String = "Core.Download"
   override val defaultStep: Option[Step] = {
     val fullStepName = Communication.fullActorName(EngineLeader.COMPONENT, EngineLeader.PACKAGE, DEFAULT_STEP_NAME)
-    Option(Step(TYPE, fullStepName, BasicLoadBalancerType(1, ClusterInstance)))
+    val step = Step(TYPE, fullStepName, BasicLoadBalancerType(1, ClusterInstance))
+    Option(step)
   }
 }

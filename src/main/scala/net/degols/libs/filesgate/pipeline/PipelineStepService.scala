@@ -1,5 +1,7 @@
 package net.degols.libs.filesgate.pipeline
 
+import net.degols.libs.filesgate.utils.Step
+
 /**
   * Contain the logic of any PipelineStep. Must be extended when we implement a PipelineStep
   */
@@ -35,15 +37,15 @@ abstract class PipelineStepService {
   }
   def pipelineManagerId: Option[String] = _pipelineManagerId
 
-  private var _name: Option[String] = None
-  private[filesgate] def setName(name: String): Unit = {
-    if(_name.isDefined) {
-      throw new Exception("The name of a PipelineStep cannot be changed once initialized!")
+  private var _step: Option[Step] = None
+  private[filesgate] def setStep(step: Step): Unit = {
+    if(_step.isDefined) {
+      throw new Exception("The step handle by a PipelineStepService cannot be changed once initialized!")
     } else {
-      _name = Option(name)
+      _step = Option(step)
     }
   }
-  def name: Option[String] = _name
+  def step: Option[Step] = _step
 
 
   /**

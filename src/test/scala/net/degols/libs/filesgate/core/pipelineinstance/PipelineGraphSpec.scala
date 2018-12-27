@@ -63,7 +63,7 @@ class PipelineGraphSpec extends TestKit(ActorSystem("MySpec")) with MockitoSugar
     steps.map(step => {
       val actorRef = system.actorOf(TestActors.echoActorProps)
       val state = PipelineStepRunning
-      val status = PipelineStepStatus(step.name, "test-1", state)
+      val status = PipelineStepStatus(step, "test-1", state)
       actorRef.toString() -> status
     }).toMap
   }

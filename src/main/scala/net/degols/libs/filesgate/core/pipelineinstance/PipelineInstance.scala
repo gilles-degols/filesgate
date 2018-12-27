@@ -67,7 +67,7 @@ class PipelineInstance(filesgateConfiguration: FilesgateConfiguration, val pipel
   def isStepFullFilled(step: Step): Boolean = {
     // We filter by PipelineStep working for the current PipelineInstanceId
     // We need to look for pipeline step having the same "full name" as the one in the given "step" attribute
-    pipelineSteps.values.filter(_.pipelineInstanceId == id.get).filter(_.fullName == step.name).exists(!_.isUnreachable)
+    pipelineSteps.values.filter(_.pipelineInstanceId == id.get).filter(_.step.name == step.name).exists(!_.isUnreachable)
   }
 
   /**
@@ -111,7 +111,7 @@ class PipelineInstance(filesgateConfiguration: FilesgateConfiguration, val pipel
           pipelineStepLastId += 1L
 
           Try {
-            val msg = PipelineStepToHandle(pipelineStepId, id.get, pipelineManagerId.get, step.name)
+            val msg = PipelineStepToHandle(pipelineStepId, id.get, pipelineManagerId.get, step)
             Communication.sendWithoutReply(context.self, act, msg)
             // We will add the watcher when we receive the reply
           } match {
@@ -164,14 +164,14 @@ class PipelineInstance(filesgateConfiguration: FilesgateConfiguration, val pipel
           } match {
             case Success(res) =>
               logger.debug(s"The PipelineStep ${message.id} has accepted to work for us ($id).")
-              val status = PipelineStepStatus(message.name, id.get, PipelineStepWaiting)
+              val status = PipelineStepStatus(message.step, id.get, PipelineStepWaiting)
               status.setActorRef(sender)
               pipelineSteps = pipelineSteps ++ Map(sender.toString() -> status)
             case Failure(err) => logger.error(s"Impossible to watch a PipelineStep($sender)")
           }
         } else {
           logger.debug(s"The PipelineStep ${message.id} has refused to work for us ($id).")
-          val status = PipelineStepStatus(message.name, id.get, PipelineStepUnknown)
+          val status = PipelineStepStatus(message.step, id.get, PipelineStepUnknown)
           pipelineSteps = pipelineSteps ++ Map(sender.toString() -> status)
           // We do not need to watch it. Rather, when we have a full graph, we should remove all the other entries now useless.
         }

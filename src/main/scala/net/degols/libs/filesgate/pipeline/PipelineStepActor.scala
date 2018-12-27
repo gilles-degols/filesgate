@@ -22,7 +22,7 @@ class PipelineStepActor(implicit val ec: ExecutionContext, pipelineStepService: 
   def running: Receive = {
     case x: PipelineStepToHandle =>
       // Every PipelineInstance will want that we work for them, but
-      sender() ! PipelineStepWorkingOn(pipelineStepService.id.get, pipelineStepService.pipelineInstanceId.get, pipelineStepService.pipelineManagerId.get, pipelineStepService.name.get)
+      sender() ! PipelineStepWorkingOn(pipelineStepService.id.get, pipelineStepService.pipelineInstanceId.get, pipelineStepService.pipelineManagerId.get, pipelineStepService.step.get)
       endProcessing(x)
 
     case message: DataSourceSeed => // Return the Source directly, not a message
@@ -64,16 +64,16 @@ class PipelineStepActor(implicit val ec: ExecutionContext, pipelineStepService: 
       pipelineStepService.setId(x.id)
       pipelineStepService.setPipelineInstanceId(x.pipelineInstanceId)
       pipelineStepService.setPipelineManagerId(x.pipelineManagerId)
-      pipelineStepService.setName(x.name)
+      pipelineStepService.setStep(x.step)
 
-      sender() ! PipelineStepWorkingOn(x.id, x.pipelineInstanceId, x.pipelineManagerId, x.name)
+      sender() ! PipelineStepWorkingOn(x.id, x.pipelineInstanceId, x.pipelineManagerId, x.step)
 
       // We watch the PipelineInstanceActor, if it dies, we should die too
       pipelineInstanceActor = Option(sender())
       context.watch(sender())
 
       context.become(running)
-      setId(pipelineStepService.id.get+"/"+pipelineStepService.name.get)
+      setId(pipelineStepService.id.get+"/"+pipelineStepService.step.get.name)
       endProcessing(x)
 
 

@@ -19,6 +19,7 @@ import net.degols.libs.filesgate.pipeline.premetadata.PreMetadata
 import net.degols.libs.filesgate.pipeline.prestorage.PreStorage
 import net.degols.libs.filesgate.pipeline.storage.Storage
 import org.slf4j.LoggerFactory
+import play.api.libs.concurrent.Futures
 
 import scala.collection.JavaConverters._
 import scala.concurrent.duration._
@@ -31,15 +32,20 @@ import scala.util.Try
   * @param maxInstances
   */
 case class Step(tpe: String, name: String, loadBalancerType: LoadBalancerType) {
+  /**
+    * Maximum timeout for the step processing. This value is overrided by FilesgateConfiguration in any case.
+    */
+  var processingTimeout: Duration = 1000 millis
+
   override def toString: String = s"Step($tpe, $name, $loadBalancerType)"
 }
 case class PipelineMetadata(id: String, steps: List[Step], instances: Int)
 
 /**
-  * Created by Gilles.Degols on 03-09-18.
+  * Play futures are used a bit everywhere in the application, so it's easier to provide it here.
   */
 @Singleton
-class FilesgateConfiguration @Inject()(val defaultConfig: Config) {
+class FilesgateConfiguration @Inject()(val defaultConfig: Config)(implicit val futures: Futures) {
   private val logger = LoggerFactory.getLogger(getClass)
   /**
     * If the library is loaded directly as a subproject, the Config of the subproject overrides the configuration of the main
@@ -110,6 +116,10 @@ class FilesgateConfiguration @Inject()(val defaultConfig: Config) {
     */
   val isDownloadActivated: Boolean = config.getBoolean("filesgate.download.activate")
 
+  /**
+    * Default timeout between every pipeline step (it can be overrided step-per-step)
+    */
+  val timeoutBetweenPipelineSteps: Duration = config.getLong("filesgate.internal.pipeline.timeout-step-ms") millis
 
   /**
     * It's difficult to get a remote actor path locally. Because of that, we still want to know the current hostname + port
@@ -163,7 +173,9 @@ class FilesgateConfiguration @Inject()(val defaultConfig: Config) {
                               val name = Communication.fullActorName(EngineLeader.COMPONENT, EngineLeader.PACKAGE, rawNameWithPipeline)
 
                               val loadBalancerType: LoadBalancerType = LoadBalancerType.loadFromConfig(rawStep.getConfig("balancer"))
-                              Step(tpe, name, loadBalancerType)
+                              val step = Step(tpe, name, loadBalancerType)
+                              step.processingTimeout = Try{rawStep.getLong("timeout-step-ms") millis}.getOrElse(timeoutBetweenPipelineSteps)
+                              step
                             })
 
         // We add missing pipeline steps between the one defined by the user, and order them correctly
@@ -196,7 +208,7 @@ class FilesgateConfiguration @Inject()(val defaultConfig: Config) {
         } else if (matchingSteps.nonEmpty) {
           matchingSteps.headOption
         } else if(stepType.MANDATORY) {
-          if(stepType.TYPE == Download.TYPE && Download.defaultStep.isDefined) {
+          val defaultStep = if(stepType.TYPE == Download.TYPE && Download.defaultStep.isDefined) {
             logger.debug("No specific step for the download phase, use the default one.")
             if(isDownloadActivated) Download.defaultStep
             else None
@@ -213,6 +225,13 @@ class FilesgateConfiguration @Inject()(val defaultConfig: Config) {
             throw new Exception("Invalid pipeline configuration.")
             None
           }
+
+          // We add some additional info in the default step
+          if(defaultStep.isDefined) {
+            defaultStep.get.processingTimeout = timeoutBetweenPipelineSteps
+          }
+
+          defaultStep
         } else { // Normal behavior, nothing to add
           None
         }
