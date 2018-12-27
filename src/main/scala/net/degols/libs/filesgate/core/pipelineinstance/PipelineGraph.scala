@@ -21,6 +21,7 @@ import net.degols.libs.filesgate.pipeline.premetadata.{PreMetadata, PreMetadataM
 import net.degols.libs.filesgate.pipeline.prestorage.{PreStorage, PreStorageMessage}
 import net.degols.libs.filesgate.pipeline.storage.{Storage, StorageMessage}
 import net.degols.libs.filesgate.utils.{FilesgateConfiguration, PipelineMetadata, Step}
+import net.degols.libs.cluster.{Tools => ClusterTools}
 import org.slf4j.{Logger, LoggerFactory}
 import play.api.libs.concurrent.Futures
 import play.api.libs.concurrent.Futures._
@@ -89,7 +90,7 @@ class PipelineGraph(filesgateConfiguration: FilesgateConfiguration) {
     // We add some logs to have some information if the stream fails.
     _stream.onComplete{
         case Success(res) => logger.warn("The stream has just been closed without any failure. A good stream is not supposed to finish at all. The stream will be restarted.")
-        case Failure(err) => logger.error(s"The stream has failed with an exception: ${net.degols.libs.cluster.Tools.formatStacktrace(err)}")
+        case Failure(err) => logger.error(s"The stream has failed with an exception: ${ClusterTools.formatStacktrace(err)}")
       }
   }
 
@@ -218,8 +219,18 @@ class PipelineGraph(filesgateConfiguration: FilesgateConfiguration) {
       Flow[PipelineStepMessage].mapAsync(50)(m => {
       logger.debug(s"Pipeline graph step: send message $m")
         (pipelineStepStatus.actorRef.get ? m).withTimeout(timeout.duration._1 millis)
-          .map(_.asInstanceOf[PipelineStepMessage])
-      }).filter(_.abort.isEmpty)
+          .map(_.asInstanceOf[PipelineStepMessage]).transformWith{
+          case Success(res) =>
+            Future{
+              Option(res)
+            }
+          case Failure(err) =>
+            Future{
+              logger.error(s"${pipelineStepStatus.step.name} - Failure while processing the message $m, skip it and go further. Exception: \n ${ClusterTools.formatStacktrace(err)}")
+              None
+            }
+        }
+      }).filter(_.isDefined).map(_.get).filter(_.abort.isEmpty)
     }).foldLeft(Flow[PipelineStepMessage])(_.via(_))
   }
 
