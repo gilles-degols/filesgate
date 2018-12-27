@@ -42,6 +42,16 @@ class PipelineGraph(filesgateConfiguration: FilesgateConfiguration) {
   var pipelineMetadata: PipelineMetadata = _
   var stepStatus: List[PipelineStepStatus] = _
 
+  /**
+    * Contains the graph created by loadGraph
+    */
+  private var _stream: Future[Done] = _
+
+  /**
+    * Return a simple future returning "Done". Useful to monitor its lifecycle. Can return null if the graph was not created.
+    */
+  def stream(): Future[Done] = _stream
+
   def constructSource: Source[FileMetadata, NotUsed] = ???
 
   def constructSource(source: Source[FileMetadata, NotUsed]): Source[FileMetadata, NotUsed] = ???
@@ -64,7 +74,7 @@ class PipelineGraph(filesgateConfiguration: FilesgateConfiguration) {
     val sink = loadSinkSteps()
 
     // Now that we have raw flows, we need to add intermediate steps to convert the data
-    source
+    _stream = source
       .map(m => MatcherMessage.from(m))
       .via(matcher)
       .via(preDownload)
@@ -75,8 +85,10 @@ class PipelineGraph(filesgateConfiguration: FilesgateConfiguration) {
       .via(metadata)
       .via(postMetadata)
       .runWith(sink)
-      .onComplete{
-        case Success(res) => logger.error("The stream has just been closed without any failure. A good stream is not supposed to finish at all.")
+
+    // We add some logs to have some information if the stream fails.
+    _stream.onComplete{
+        case Success(res) => logger.warn("The stream has just been closed without any failure. A good stream is not supposed to finish at all. The stream will be restarted.")
         case Failure(err) => logger.error(s"The stream has failed with an exception: ${net.degols.libs.cluster.Tools.formatStacktrace(err)}")
       }
   }

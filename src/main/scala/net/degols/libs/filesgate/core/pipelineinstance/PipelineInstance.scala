@@ -6,12 +6,13 @@ import net.degols.libs.filesgate.core._
 import net.degols.libs.filesgate.utils.{FilesgateConfiguration, PipelineMetadata, Step}
 import org.slf4j.{Logger, LoggerFactory}
 
+import scala.concurrent.ExecutionContext
 import scala.util.{Failure, Random, Success, Try}
 
 /**
   * Work for only one PipelineInstanceActor linked to only one PipelineManager. Handle multiple PipelineStepActors
   */
-class PipelineInstance(filesgateConfiguration: FilesgateConfiguration, val pipelineGraph: PipelineGraph) {
+class PipelineInstance(filesgateConfiguration: FilesgateConfiguration, val pipelineGraph: PipelineGraph)(implicit val ec: ExecutionContext) {
   private val logger: Logger = LoggerFactory.getLogger(getClass)
 
   // Set by the PipelineInstanceActor when it is started
@@ -130,7 +131,7 @@ class PipelineInstance(filesgateConfiguration: FilesgateConfiguration, val pipel
   }
 
   /**
-    * Check if the graph is already running, in that case there is no need to re-create it
+    * Check if the graph is already running, in that case there is no need to re-create it.
     */
   def isGraphRunning: Boolean = _graphIsRunning
 
@@ -140,7 +141,24 @@ class PipelineInstance(filesgateConfiguration: FilesgateConfiguration, val pipel
   def launchWork(): Unit = {
     _graphIsRunning = true
 
+    // We load the graph, then we check the stream to be sure to relaunch it if it fails / finish (the stream is not
+    // supposed to finish)
     pipelineGraph.loadGraph(pipelineMetadata, pipelineSteps)
+
+    val stream = pipelineGraph.stream()
+    if(stream == null) {
+      logger.error("No stream found after asking PipelineGraph to create one. We assume the stream could not be created at all. We will retry in a short time.")
+      _graphIsRunning = false
+    } else {
+      stream.onComplete{
+        case Success(res) =>
+          logger.error("Stream finished successfully, we assume that a stream should never finish so we will try to restart it.")
+          _graphIsRunning = false
+        case Failure(err) =>
+          logger.error(s"Stream finished with an error: ${net.degols.libs.cluster.Tools.formatStacktrace(err)}")
+          _graphIsRunning = false
+      }
+    }
   }
 
 
