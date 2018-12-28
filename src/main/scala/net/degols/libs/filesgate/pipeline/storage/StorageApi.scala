@@ -32,7 +32,6 @@ class Storage(implicit val ec: ExecutionContext, dbService: StorageContentApi) e
 
   override def process(storeMessage: StorageMessage): Future[StorageMessage] = {
     dbService.upsert(storeMessage.fileMetadata, storeMessage.fileContent.get).map(res => {
-      logger.debug("End storeMessage...")
       storeMessage
     })
   }

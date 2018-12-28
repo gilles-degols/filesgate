@@ -22,6 +22,7 @@ import net.degols.libs.filesgate.pipeline.prestorage.{PreStorage, PreStorageMess
 import net.degols.libs.filesgate.pipeline.storage.{Storage, StorageMessage}
 import net.degols.libs.filesgate.utils.{FilesgateConfiguration, PipelineMetadata, Step}
 import net.degols.libs.cluster.{Tools => ClusterTools}
+import net.degols.libs.filesgate.pipeline.failurehandling.{FailureHandling, FailureHandlingMessage}
 import org.slf4j.{Logger, LoggerFactory}
 import play.api.libs.concurrent.Futures
 import play.api.libs.concurrent.Futures._
@@ -30,6 +31,12 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.concurrent.duration._
 import scala.util.{Failure, Success, Try}
+
+/**
+  * Specific object to pass failure between steps, to store them at the end of the stream
+  */
+case class PipelineStepMessageWrapper(originalMessage: PipelineStepMessage, failure: Option[FailureHandlingMessage])
+
 
 /**
   * In charge of constructing the graph to fetch the data until writing them. Only create the graph, does not run it.
@@ -72,11 +79,12 @@ class PipelineGraph(filesgateConfiguration: FilesgateConfiguration) {
     val preMetadata = loadPreMetadataSteps()
     val metadata = loadMetadataSteps()
     val postMetadata = loadPostMetadataSteps()
+    val failureHandling = loadFailureHandlingSteps()
     val sink = loadSinkSteps()
 
     // Now that we have raw flows, we need to add intermediate steps to convert the data
     _stream = source
-      .map(m => MatcherMessage.from(m))
+      .map(m => PipelineStepMessageWrapper(MatcherMessage.from(m), None))
       .via(matcher)
       .via(preDownload)
       .via(download)
@@ -85,6 +93,7 @@ class PipelineGraph(filesgateConfiguration: FilesgateConfiguration) {
       .via(preMetadata)
       .via(metadata)
       .via(postMetadata)
+      .via(failureHandling)
       .runWith(sink)
 
     // We add some logs to have some information if the stream fails.
@@ -105,73 +114,122 @@ class PipelineGraph(filesgateConfiguration: FilesgateConfiguration) {
   /**
     * Load matcher steps
     */
-  def loadMatcherSteps(): Flow[PipelineStepMessage, PipelineStepMessage, NotUsed] = {
+  def loadMatcherSteps(): Flow[PipelineStepMessageWrapper, PipelineStepMessageWrapper, NotUsed] = {
     val stepWrappers = stepWrappersFromType(tpe = Matcher.TYPE)
-    val flowStep: Flow[PipelineStepMessage, PipelineStepMessage, NotUsed] = loadAnySteps(stepWrappers.map(_._2))
-    flowStep.map(m => PreDownloadMessage.from(m.asInstanceOf[MatcherMessage]))
+    val flowStep: Flow[PipelineStepMessageWrapper, PipelineStepMessageWrapper, NotUsed] = loadAnySteps(stepWrappers.map(_._2))
+    flowStep.map(m => {
+      m.failure match {
+        case Some(err) => m
+        case None => PipelineStepMessageWrapper(PreDownloadMessage.from(m.originalMessage.asInstanceOf[MatcherMessage]), None)
+      }
+    })
   }
 
   /**
     * Load pre-download steps
     */
-  def loadPreDownloadSteps(): Flow[PipelineStepMessage, PipelineStepMessage, NotUsed] = {
+  def loadPreDownloadSteps(): Flow[PipelineStepMessageWrapper, PipelineStepMessageWrapper, NotUsed] = {
     val stepWrappers = stepWrappersFromType(tpe = PreDownload.TYPE)
     val flowStep = loadAnySteps(stepWrappers.map(_._2))
-    flowStep.map(m => DownloadMessage.from(m.asInstanceOf[PreDownloadMessage]))
+    flowStep.map(m => {
+      m.failure match {
+        case Some(err) => m
+        case None => PipelineStepMessageWrapper(DownloadMessage.from(m.originalMessage.asInstanceOf[PreDownloadMessage]), None)
+      }
+    })
   }
 
   /**
     * Load download steps
     */
-  def loadDownloadSteps(): Flow[PipelineStepMessage, PipelineStepMessage, NotUsed] = {
+  def loadDownloadSteps(): Flow[PipelineStepMessageWrapper, PipelineStepMessageWrapper, NotUsed] = {
     val stepWrappers = stepWrappersFromType(tpe = Download.TYPE)
     val flowStep = loadAnySteps(stepWrappers.map(_._2))
-    flowStep.map(m => PreStorageMessage.from(m.asInstanceOf[DownloadMessage]))
+    flowStep.map(m => {
+      m.failure match {
+        case Some(err) => m
+        case None => PipelineStepMessageWrapper(PreStorageMessage.from(m.originalMessage.asInstanceOf[DownloadMessage]), None)
+      }
+    })
   }
 
   /**
     * Load pre-storage steps
     */
-  def loadPreStorageSteps(): Flow[PipelineStepMessage, PipelineStepMessage, NotUsed] = {
+  def loadPreStorageSteps(): Flow[PipelineStepMessageWrapper, PipelineStepMessageWrapper, NotUsed] = {
     val stepWrappers = stepWrappersFromType(tpe = PreStorage.TYPE)
     val flowStep = loadAnySteps(stepWrappers.map(_._2))
-    flowStep.map(m => StorageMessage.from(m.asInstanceOf[PreStorageMessage]))
+    flowStep.map(m => {
+      m.failure match {
+        case Some(err) => m
+        case None => PipelineStepMessageWrapper(StorageMessage.from(m.originalMessage.asInstanceOf[PreStorageMessage]), None)
+      }
+    })
   }
 
   /**
     * Load storage steps
     */
-  def loadStorageSteps(): Flow[PipelineStepMessage, PipelineStepMessage, NotUsed] = {
+  def loadStorageSteps(): Flow[PipelineStepMessageWrapper, PipelineStepMessageWrapper, NotUsed] = {
     val stepWrappers = stepWrappersFromType(tpe = Storage.TYPE)
     val flowStep = loadAnySteps(stepWrappers.map(_._2))
-    flowStep.map(m => PreMetadataMessage.from(m.asInstanceOf[StorageMessage]))
+    flowStep.map(m => {
+      m.failure match {
+        case Some(err) => m
+        case None => PipelineStepMessageWrapper(PreMetadataMessage.from(m.originalMessage.asInstanceOf[StorageMessage]), None)
+      }
+    })
   }
 
   /**
     * Load pre-metadata steps
     */
-  def loadPreMetadataSteps(): Flow[PipelineStepMessage, PipelineStepMessage, NotUsed] = {
+  def loadPreMetadataSteps(): Flow[PipelineStepMessageWrapper, PipelineStepMessageWrapper, NotUsed] = {
     val stepWrappers = stepWrappersFromType(tpe = PreMetadata.TYPE)
     val flowStep = loadAnySteps(stepWrappers.map(_._2))
-    flowStep.map(m => MetadataMessage.from(m.asInstanceOf[PreMetadataMessage]))
+    flowStep.map(m => {
+      m.failure match {
+        case Some(err) => m
+        case None => PipelineStepMessageWrapper(MetadataMessage.from(m.originalMessage.asInstanceOf[PreMetadataMessage]), None)
+      }
+    })
   }
 
   /**
     * Load metadata steps
     */
-  def loadMetadataSteps(): Flow[PipelineStepMessage, PipelineStepMessage, NotUsed] = {
+  def loadMetadataSteps(): Flow[PipelineStepMessageWrapper, PipelineStepMessageWrapper, NotUsed] = {
     val stepWrappers = stepWrappersFromType(tpe = Metadata.TYPE)
     val flowStep = loadAnySteps(stepWrappers.map(_._2))
-    flowStep.map(m => PostMetadataMessage.from(m.asInstanceOf[MetadataMessage]))
+    flowStep.map(m => {
+      m.failure match {
+        case Some(err) => m
+        case None => PipelineStepMessageWrapper(PostMetadataMessage.from(m.originalMessage.asInstanceOf[MetadataMessage]), None)
+      }
+    })
   }
 
   /**
     * Load post-metadata steps
     */
-  def loadPostMetadataSteps(): Flow[PipelineStepMessage, PipelineStepMessage, NotUsed] = {
+  def loadPostMetadataSteps(): Flow[PipelineStepMessageWrapper, PipelineStepMessageWrapper, NotUsed] = {
     val stepWrappers = stepWrappersFromType(tpe = PostMetadata.TYPE)
     val flowStep = loadAnySteps(stepWrappers.map(_._2))
+    // In this case, no need to convert the message, the only remaining step is to handle failure, so we can keep the raw messages
     flowStep
+  }
+
+  /**
+    * Load failure handling steps
+    */
+  def loadFailureHandlingSteps(): Flow[PipelineStepMessageWrapper, PipelineStepMessageWrapper, NotUsed] = {
+    val stepWrappers = stepWrappersFromType(tpe = FailureHandling.TYPE)
+    val flowStep = loadAnySteps(stepWrappers.map(_._2))
+    // For this particular step, we want to have the "failure" in the PipelineStepMessageWrapper as the message itself
+    Flow[PipelineStepMessageWrapper].filter(_.failure.isDefined).map(m => {
+      logger.debug("Prepare message for FailureHandling")
+      PipelineStepMessageWrapper(m.failure.get, None)
+    }).via(flowStep)
   }
 
   /**
@@ -211,27 +269,42 @@ class PipelineGraph(filesgateConfiguration: FilesgateConfiguration) {
     * Load any type of steps and merge flows of the same type. If some steps are missing this is not a problem.
     * Only exception: source and sink
     */
-  private def loadAnySteps(pipelineStepStatuses: List[PipelineStepStatus]): Flow[PipelineStepMessage, PipelineStepMessage, NotUsed] = {
+  private def loadAnySteps(pipelineStepStatuses: List[PipelineStepStatus]): Flow[PipelineStepMessageWrapper, PipelineStepMessageWrapper, NotUsed] = {
     pipelineStepStatuses.map(pipelineStepStatus => {
       // timeout for the Ask pattern
       implicit val timeout = Timeout(pipelineStepStatus.step.processingTimeout._1 millis)
 
-      Flow[PipelineStepMessage].mapAsync(50)(m => {
-      logger.debug(s"Pipeline graph step: send message $m")
-        (pipelineStepStatus.actorRef.get ? m).withTimeout(timeout.duration._1 millis)
-          .map(_.asInstanceOf[PipelineStepMessage]).transformWith{
-          case Success(res) =>
-            Future{
-              Option(res)
-            }
-          case Failure(err) =>
-            Future{
-              logger.error(s"${pipelineStepStatus.step.name} - Failure while processing the message $m, skip it and go further. Exception: \n ${ClusterTools.formatStacktrace(err)}")
-              None
+      Flow[PipelineStepMessageWrapper].mapAsync(50)(m => {
+        m.failure match {
+          case Some(failure) =>
+            logger.debug(s"Pipeline graph step: message ${failure.initialMessage} is a previous failure, skip the crurent step")
+            Future{m}
+          case None =>
+            logger.debug(s"Pipeline graph step: send message $m")
+            (pipelineStepStatus.actorRef.get ? m.originalMessage).withTimeout(timeout.duration._1 millis)
+              .map(_.asInstanceOf[PipelineStepMessage]).transformWith{
+              // We receive a raw message or a failure, but we need to return a PipelineStepMessageWrapper in any case
+              case Success(res) =>
+                Future{
+                  // The abort field is a nice "skip" order given by the developer
+                  res.abort match {
+                    case Some(abortInfo) =>
+                      val failure = FailureHandlingMessage.from(m.originalMessage, Some(res), None)
+                      PipelineStepMessageWrapper(m.originalMessage, Some(failure))
+                    case None =>
+                      PipelineStepMessageWrapper(res, None)
+                  }
+                }
+              case Failure(err) =>
+                Future{
+                  logger.error(s"${pipelineStepStatus.step.name} - Failure while processing the message $m, skip it and go further. Exception: \n ${ClusterTools.formatStacktrace(err)}")
+                  val failure = FailureHandlingMessage.from(m.originalMessage, None, Some(err))
+                  PipelineStepMessageWrapper(m.originalMessage, Some(failure))
+                }
             }
         }
-      }).filter(_.isDefined).map(_.get).filter(_.abort.isEmpty)
-    }).foldLeft(Flow[PipelineStepMessage])(_.via(_))
+      })
+    }).foldLeft(Flow[PipelineStepMessageWrapper])(_.via(_))
   }
 
   /**

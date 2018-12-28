@@ -13,6 +13,7 @@ import net.degols.libs.filesgate.core.engine.{Engine, EngineActor}
 import net.degols.libs.filesgate.core.pipelineinstance.PipelineInstanceActor
 import net.degols.libs.filesgate.core.pipelinemanager.PipelineManagerActor
 import net.degols.libs.filesgate.pipeline.download.Download
+import net.degols.libs.filesgate.pipeline.failurehandling.FailureHandling
 import net.degols.libs.filesgate.pipeline.metadata.Metadata
 import net.degols.libs.filesgate.pipeline.storage.Storage
 import net.degols.libs.filesgate.pipeline.{PipelineStepActor, PipelineStepService}
@@ -74,6 +75,12 @@ abstract class EngineLeader @Inject()(engine: Engine,
         // We must create the default Metadata actor + selected service (for now, only MongoDB, but afterwards another one can be created)
         implicit val dbService: StorageMetadataApi = new MongoMetadata(filesgateConfiguration, tools)
         val service: PipelineStepService = new Metadata()
+        context.actorOf(Props.create(classOf[PipelineStepActor], ec, service).withMailbox("priority-stashed-actor"))
+      case FailureHandling.DEFAULT_STEP_NAME =>
+        // We must create the default FailureHandling actor + selected service (for now, only MongoDB, but afterwards another one can be created)
+        // Note that we use the same service as the one for the metadata, there is no reason to have a different one
+        implicit val dbService: StorageMetadataApi = new MongoMetadata(filesgateConfiguration, tools)
+        val service: PipelineStepService = new FailureHandling()
         context.actorOf(Props.create(classOf[PipelineStepActor], ec, service).withMailbox("priority-stashed-actor"))
       case x =>
         // We try to find if the workertypeid is linked to a PipelineStep

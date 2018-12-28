@@ -56,7 +56,7 @@ class Download(implicit val ec: ExecutionContext, tools: Tools) extends Download
       val downloadMetadata = Json.obj(
         "download_time" -> Json.obj("$date" -> rawDownloadFile.start.getTime),
         "download_duration_ms" -> duration,
-        "size_b" -> Json.obj("$numberLong" -> rawDownloadFile.size)
+        "size_b" ->  rawDownloadFile.size
       )
       downloadMessage.fileMetadata.downloaded = true
       downloadMessage.fileMetadata.metadata = downloadMessage.fileMetadata.metadata ++ downloadMetadata

@@ -11,6 +11,7 @@ import net.degols.libs.filesgate.core.EngineLeader
 import net.degols.libs.filesgate.pipeline.PipelineStep
 import net.degols.libs.filesgate.pipeline.datasource.DataSource
 import net.degols.libs.filesgate.pipeline.download.Download
+import net.degols.libs.filesgate.pipeline.failurehandling.FailureHandling
 import net.degols.libs.filesgate.pipeline.matcher.Matcher
 import net.degols.libs.filesgate.pipeline.metadata.Metadata
 import net.degols.libs.filesgate.pipeline.postmetadata.PostMetadata
@@ -105,6 +106,11 @@ class FilesgateConfiguration @Inject()(val defaultConfig: Config)(implicit val f
     * Is the default metadata storage activated?
     */
   val isStoreMetadataActivated: Boolean = config.getBoolean("filesgate.storage.metadata.activate")
+
+  /**
+    * Is the default failureHandling activated (in metadata)?
+    */
+  val isStoreFailureActivated: Boolean = config.getBoolean("filesgate.storage.failurehandling.activate")
 
   /**
     * Is the default content storage activated ?
@@ -220,6 +226,10 @@ class FilesgateConfiguration @Inject()(val defaultConfig: Config)(implicit val f
             logger.debug("No specific step for the metadata phase, use the default one.")
             if(isStoreMetadataActivated) Metadata.defaultStep
             else None
+          } else if(stepType.TYPE == FailureHandling.TYPE && FailureHandling.defaultStep.isDefined) {
+            logger.debug("No specific step for the failure handling phase, use the default one.")
+            if(isStoreFailureActivated) FailureHandling.defaultStep
+            else None
           } else {
             logger.error(s"Missing mandatory step for ${pipelineId}: ${stepType.TYPE}. Abort.")
             throw new Exception("Invalid pipeline configuration.")
@@ -266,5 +276,6 @@ object FilesgateConfiguration {
                                                       Storage,
                                                       PreMetadata,
                                                       Metadata,
-                                                      PostMetadata)
+                                                      PostMetadata,
+                                                      FailureHandling)
 }
