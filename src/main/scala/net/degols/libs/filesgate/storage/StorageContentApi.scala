@@ -3,7 +3,6 @@ package net.degols.libs.filesgate.storage
 import net.degols.libs.filesgate.orm.{FileContent, FileMetadata}
 
 import scala.concurrent.Future
-import scala.util.Try
 
 trait StorageContentApi {
   /**

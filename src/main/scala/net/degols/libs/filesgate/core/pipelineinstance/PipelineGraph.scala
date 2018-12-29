@@ -7,12 +7,13 @@ import akka.stream.scaladsl.{Flow, Sink, Source}
 import akka.util.Timeout
 import akka.{Done, NotUsed}
 import net.degols.libs.cluster.messages.Communication
-import net.degols.libs.filesgate.Tools
+import net.degols.libs.cluster.{Tools => ClusterTools}
 import net.degols.libs.filesgate.core.PipelineStepStatus
 import net.degols.libs.filesgate.orm.FileMetadata
 import net.degols.libs.filesgate.pipeline.PipelineStepMessage
 import net.degols.libs.filesgate.pipeline.datasource.{DataSource, DataSourceSeed}
 import net.degols.libs.filesgate.pipeline.download.{Download, DownloadMessage}
+import net.degols.libs.filesgate.pipeline.failurehandling.{FailureHandling, FailureHandlingMessage}
 import net.degols.libs.filesgate.pipeline.matcher.{Matcher, MatcherMessage}
 import net.degols.libs.filesgate.pipeline.metadata.{Metadata, MetadataMessage}
 import net.degols.libs.filesgate.pipeline.postmetadata.{PostMetadata, PostMetadataMessage}
@@ -21,8 +22,6 @@ import net.degols.libs.filesgate.pipeline.premetadata.{PreMetadata, PreMetadataM
 import net.degols.libs.filesgate.pipeline.prestorage.{PreStorage, PreStorageMessage}
 import net.degols.libs.filesgate.pipeline.storage.{Storage, StorageMessage}
 import net.degols.libs.filesgate.utils.{FilesgateConfiguration, PipelineMetadata, Step}
-import net.degols.libs.cluster.{Tools => ClusterTools}
-import net.degols.libs.filesgate.pipeline.failurehandling.{FailureHandling, FailureHandlingMessage}
 import org.slf4j.{Logger, LoggerFactory}
 import play.api.libs.concurrent.Futures
 import play.api.libs.concurrent.Futures._
@@ -30,7 +29,7 @@ import play.api.libs.concurrent.Futures._
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.concurrent.duration._
-import scala.util.{Failure, Success, Try}
+import scala.util.{Failure, Success}
 
 /**
   * Specific object to pass failure between steps, to store them at the end of the stream

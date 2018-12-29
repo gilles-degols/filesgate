@@ -4,7 +4,6 @@ import net.degols.libs.filesgate.orm.FileMetadata
 import net.degols.libs.filesgate.pipeline.failurehandling.FailureHandlingMessage
 
 import scala.concurrent.Future
-import scala.util.Try
 
 trait StorageMetadataApi {
   def upsert(failureHandlingMessage: FailureHandlingMessage): Future[UpdateOperation]

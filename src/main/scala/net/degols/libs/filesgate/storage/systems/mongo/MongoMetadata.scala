@@ -2,18 +2,17 @@ package net.degols.libs.filesgate.storage.systems.mongo
 
 import com.google.inject.Inject
 import javax.inject.Singleton
-import net.degols.libs.filesgate.Tools
 import net.degols.libs.cluster.{Tools => ClusterTools}
-import net.degols.libs.filesgate.orm.{FileContent, FileMetadata}
+import net.degols.libs.filesgate.Tools
+import net.degols.libs.filesgate.orm.FileMetadata
 import net.degols.libs.filesgate.pipeline.failurehandling.FailureHandlingMessage
-import net.degols.libs.filesgate.storage.{SaveOperation, StorageMetadataApi, UpdateOperation}
+import net.degols.libs.filesgate.storage.{StorageMetadataApi, UpdateOperation}
 import net.degols.libs.filesgate.utils.{FailedDatabaseOperation, FilesgateConfiguration, MetadataNotFound, Tools}
 import org.slf4j.{Logger, LoggerFactory}
 import play.api.libs.json.{JsObject, Json}
 
 import scala.concurrent.Future
 import scala.util.{Failure, Success}
-import scala.xml.Document
 
 /**
   * Handle every query linked to the storage of metadata linked to a file.

@@ -15,11 +15,10 @@ import net.degols.libs.filesgate.core.pipelinemanager.PipelineManagerActor
 import net.degols.libs.filesgate.pipeline.download.Download
 import net.degols.libs.filesgate.pipeline.failurehandling.FailureHandling
 import net.degols.libs.filesgate.pipeline.metadata.Metadata
-import net.degols.libs.filesgate.pipeline.metadata.Metadata.DEFAULT_STEP_NAME
 import net.degols.libs.filesgate.pipeline.storage.Storage
 import net.degols.libs.filesgate.pipeline.{PipelineStepActor, PipelineStepService}
-import net.degols.libs.filesgate.storage.{StorageContentApi, StorageMetadataApi}
 import net.degols.libs.filesgate.storage.systems.mongo.{MongoContent, MongoMetadata}
+import net.degols.libs.filesgate.storage.{StorageContentApi, StorageMetadataApi}
 import net.degols.libs.filesgate.utils.{FilesgateConfiguration, PipelineMetadata, Step, Tools}
 import org.slf4j.LoggerFactory
 

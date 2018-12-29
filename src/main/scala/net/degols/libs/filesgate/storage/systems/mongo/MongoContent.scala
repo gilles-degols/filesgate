@@ -1,18 +1,15 @@
 package net.degols.libs.filesgate.storage.systems.mongo
 
-import java.io.{BufferedInputStream, ByteArrayInputStream, InputStream}
-
 import com.google.inject.Inject
 import javax.inject.Singleton
 import net.degols.libs.filesgate.orm.{FileContent, FileMetadata}
-import net.degols.libs.filesgate.storage.{SaveOperation, StorageContentApi, UpdateOperation}
+import net.degols.libs.filesgate.storage.{StorageContentApi, UpdateOperation}
 import net.degols.libs.filesgate.utils.{FileNotFound, FilesgateConfiguration, Tools}
 import org.bson.Document
 import org.slf4j.{Logger, LoggerFactory}
 import play.api.libs.json.Json
 
 import scala.concurrent.{ExecutionContextExecutor, Future}
-import scala.util.{Failure, Success, Try}
 
 
 /**

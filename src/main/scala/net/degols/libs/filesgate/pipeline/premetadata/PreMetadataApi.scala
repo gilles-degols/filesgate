@@ -1,9 +1,8 @@
 package net.degols.libs.filesgate.pipeline.premetadata
 
 import net.degols.libs.filesgate.orm.FileMetadata
-import net.degols.libs.filesgate.pipeline.{AbortStep, PipelineStep, PipelineStepMessage, PipelineStepService}
-import net.degols.libs.filesgate.pipeline.download.DownloadMessage
 import net.degols.libs.filesgate.pipeline.storage.StorageMessage
+import net.degols.libs.filesgate.pipeline.{AbortStep, PipelineStep, PipelineStepMessage, PipelineStepService}
 import org.slf4j.{Logger, LoggerFactory}
 import play.api.libs.json.JsObject
 

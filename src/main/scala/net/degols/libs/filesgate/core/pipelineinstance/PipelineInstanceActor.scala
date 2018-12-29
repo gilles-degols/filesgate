@@ -4,7 +4,6 @@ import akka.actor.{Actor, ActorRef, Kill, Terminated}
 import net.degols.libs.filesgate.core._
 import net.degols.libs.filesgate.utils.FilesgateConfiguration
 import org.slf4j.{Logger, LoggerFactory}
-import play.api.libs.concurrent.Futures
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
