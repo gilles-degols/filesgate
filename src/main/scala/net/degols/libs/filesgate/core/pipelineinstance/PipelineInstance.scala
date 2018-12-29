@@ -39,8 +39,15 @@ class PipelineInstance(filesgateConfiguration: FilesgateConfiguration, val pipel
   }
   def pipelineManagerId: Option[String] = _pipelineManagerId
 
-  // Temporary
+  /**
+    * To be sure to only start once instance of the pipeline
+    */
   var _graphIsRunning: Boolean = false
+
+  /**
+    * If the stream finishes successfully, we might not want to restart it (it depends on the developer).
+    */
+  var _graphIsFinished: Boolean = false
 
   /**
     * Metadata of the current pipeline.
@@ -90,9 +97,11 @@ class PipelineInstance(filesgateConfiguration: FilesgateConfiguration, val pipel
     // TODO: In very specific case, we might use a bit more PipelineInstances than we should (if we sent the message and before receiving a result we sent the message to another actor)
     val missingSteps = pipelineMetadata.steps.filterNot(isStepFullFilled)
 
-    if(missingSteps.isEmpty && !isGraphRunning) {
-      logger.info("We have all PipelineSteps necessary to start our PipelineInstance, we try to create the graph.")
+    if(missingSteps.isEmpty && !isGraphRunning && !isGraphFinished) {
+      logger.info(s"We have all PipelineSteps necessary to start our PipelineInstance ${id.get}, we try to create the graph.")
       launchWork()
+    } else if(isGraphFinished) {
+      logger.info(s"The PipelineInstance ${id.get} is finished successfully, we do not restart it.")
     }
 
     // TODO: We should try to find step in the same node, or even the same jvm if possible, that would reduce the inter-nodes
@@ -136,6 +145,11 @@ class PipelineInstance(filesgateConfiguration: FilesgateConfiguration, val pipel
   def isGraphRunning: Boolean = _graphIsRunning
 
   /**
+    * Check if the graph is already finished
+    */
+  def isGraphFinished: Boolean = _graphIsFinished
+
+  /**
     * In charge of launching the pipeline of actors to work together as a streaming process (if not yet done)
     */
   def launchWork(): Unit = {
@@ -152,7 +166,13 @@ class PipelineInstance(filesgateConfiguration: FilesgateConfiguration, val pipel
     } else {
       stream.onComplete{
         case Success(res) =>
-          logger.error("Stream finished successfully, we assume that a stream should never finish so we will try to restart it.")
+          if(pipelineMetadata.restartWhenFinished) {
+            logger.warn("Stream finished successfully, but the configuration asks to restart it in this case.")
+            // Nothing specific to do in this case
+          } else {
+            logger.info("Stream finished successfully, and the configuration did not ask to restart it in this case.")
+            _graphIsFinished = true
+          }
           _graphIsRunning = false
         case Failure(err) =>
           logger.error(s"Stream finished with an error: ${net.degols.libs.cluster.Tools.formatStacktrace(err)}")

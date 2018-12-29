@@ -96,11 +96,7 @@ class PipelineGraph(filesgateConfiguration: FilesgateConfiguration) {
       .via(failureHandling)
       .runWith(sink)
 
-    // We add some logs to have some information if the stream fails.
-    _stream.onComplete{
-        case Success(res) => logger.warn("The stream has just been closed without any failure. A good stream is not supposed to finish at all. The stream will be restarted.")
-        case Failure(err) => logger.error(s"The stream has failed with an exception: ${ClusterTools.formatStacktrace(err)}")
-      }
+    // We do not add logs to the stream here, but one level above (in charge of asking the stream to start and monitor it)
   }
 
   /**

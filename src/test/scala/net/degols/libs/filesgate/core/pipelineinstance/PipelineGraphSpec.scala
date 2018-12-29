@@ -44,7 +44,8 @@ class PipelineGraphSpec extends TestKit(ActorSystem("MySpec")) with MockitoSugar
     Step(Metadata.TYPE, "Component:Package:test.metadata", BasicLoadBalancerType(1, ClusterInstance)),
     Step(PostMetadata.TYPE, "Component:Package:test.postmetadata", BasicLoadBalancerType(1, ClusterInstance))
   )
-  var pipelineMetadata: PipelineMetadata = PipelineMetadata("test", steps, 1)
+  var pipelineConfig = ConfigFactory.parseString("""""")
+  var pipelineMetadata: PipelineMetadata = PipelineMetadata("test", steps, pipelineConfig)
   var pipelineSteps: Map[String, PipelineStepStatus] = constructPipelineSteps(steps)
   var pipelineGraph: PipelineGraph = new PipelineGraph(filesgateConfiguration)
   pipelineGraph.pipelineMetadata = pipelineMetadata

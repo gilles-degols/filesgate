@@ -40,7 +40,13 @@ case class Step(tpe: String, name: String, loadBalancerType: LoadBalancerType) {
 
   override def toString: String = s"Step($tpe, $name, $loadBalancerType)"
 }
-case class PipelineMetadata(id: String, steps: List[Step], instances: Int)
+case class PipelineMetadata(id: String, steps: List[Step], private val config: Config) {
+  // Max number of pipeline instances
+  val instances: Int = Try{config.getInt("pipeline-instance.quantity")}.getOrElse(1)
+
+  // Should we restart the pipeline if the stream finish successfully ?
+  val restartWhenFinished: Boolean = Try{config.getBoolean("restart-when-finished")}.getOrElse(false)
+}
 
 /**
   * Play futures are used a bit everywhere in the application, so it's easier to provide it here.
@@ -168,7 +174,7 @@ class FilesgateConfiguration @Inject()(val defaultConfig: Config)(implicit val f
     val res = set map {
       case (key, value) =>
         val id = key
-        val currentPipeline = value.asInstanceOf[ConfigObject].toConfig
+        val currentPipeline: Config = value.asInstanceOf[ConfigObject].toConfig
 
         val steps: List[Step] = currentPipeline.getConfigList("steps").asScala.toList
                             .map(rawStep => {
@@ -187,10 +193,8 @@ class FilesgateConfiguration @Inject()(val defaultConfig: Config)(implicit val f
         // We add missing pipeline steps between the one defined by the user, and order them correctly
         val allSteps = completePipelineSteps(id, steps)
 
-        val instances = currentPipeline.getInt("pipeline-instance.quantity")
-
-        logger.info(s"PipelineStep '$id' ($instances): $allSteps")
-        PipelineMetadata(id, allSteps, instances)
+        logger.info(s"PipelineStep '$id': $allSteps")
+        PipelineMetadata(id, allSteps, currentPipeline)
     }
 
     res
