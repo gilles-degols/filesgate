@@ -40,7 +40,7 @@ trait DownloadApi extends PipelineStepService {
 }
 
 
-class Download(implicit val ec: ExecutionContext, tools: Tools) extends DownloadApi{
+class Download(tools: Tools)(implicit val ec: ExecutionContext) extends DownloadApi{
   private val logger: Logger = LoggerFactory.getLogger(getClass)
 
   /**
@@ -68,7 +68,7 @@ class Download(implicit val ec: ExecutionContext, tools: Tools) extends Download
 
 object Download extends PipelineStep{
   override val TYPE: String = "download"
-  override val MANDATORY: Boolean = true
+  override val IMPORTANT_STEP: Boolean = true
   override val DEFAULT_STEP_NAME: String = "Core.Download"
   override val defaultStep: Option[Step] = {
     val fullStepName = Communication.fullActorName(EngineLeader.COMPONENT, EngineLeader.PACKAGE, DEFAULT_STEP_NAME)

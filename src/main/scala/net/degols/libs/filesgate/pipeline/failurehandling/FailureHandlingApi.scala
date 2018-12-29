@@ -33,7 +33,7 @@ trait FailureHandlingApi extends PipelineStepService {
 }
 
 
-class FailureHandling(implicit val ec: ExecutionContext, dbService: StorageMetadataApi) extends FailureHandlingApi {
+class FailureHandling(dbService: StorageMetadataApi)(implicit val ec: ExecutionContext) extends FailureHandlingApi {
   private val logger: Logger = LoggerFactory.getLogger(getClass)
 
   override def process(failureHandlingMessage: FailureHandlingMessage): Future[FailureHandlingMessage] = {
@@ -45,7 +45,7 @@ class FailureHandling(implicit val ec: ExecutionContext, dbService: StorageMetad
 
 object FailureHandling extends PipelineStep{
   override val TYPE: String = "failurehandling"
-  override val MANDATORY: Boolean = true
+  override val IMPORTANT_STEP: Boolean = true
   override val DEFAULT_STEP_NAME: String = "Core.FailureHandling"
   override val defaultStep: Option[Step] = {
     val fullStepName = Communication.fullActorName(EngineLeader.COMPONENT, EngineLeader.PACKAGE, DEFAULT_STEP_NAME)

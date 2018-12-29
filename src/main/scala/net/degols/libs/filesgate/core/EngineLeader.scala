@@ -15,11 +15,12 @@ import net.degols.libs.filesgate.core.pipelinemanager.PipelineManagerActor
 import net.degols.libs.filesgate.pipeline.download.Download
 import net.degols.libs.filesgate.pipeline.failurehandling.FailureHandling
 import net.degols.libs.filesgate.pipeline.metadata.Metadata
+import net.degols.libs.filesgate.pipeline.metadata.Metadata.DEFAULT_STEP_NAME
 import net.degols.libs.filesgate.pipeline.storage.Storage
 import net.degols.libs.filesgate.pipeline.{PipelineStepActor, PipelineStepService}
 import net.degols.libs.filesgate.storage.{StorageContentApi, StorageMetadataApi}
 import net.degols.libs.filesgate.storage.systems.mongo.{MongoContent, MongoMetadata}
-import net.degols.libs.filesgate.utils.{FilesgateConfiguration, Tools}
+import net.degols.libs.filesgate.utils.{FilesgateConfiguration, PipelineMetadata, Step, Tools}
 import org.slf4j.LoggerFactory
 
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor}
@@ -54,43 +55,69 @@ abstract class EngineLeader @Inject()(engine: Engine,
     * @param workerTypeId
     */
   final override def startWorker(workerTypeId: String, actorName: String): ActorRef = {
-    workerTypeId match {
-      case EngineActor.name =>
-        context.actorOf(Props.create(classOf[EngineActor], engine, filesgateConfiguration), name = actorName)
-      case PipelineManagerActor.NAME =>
-        context.actorOf(Props.create(classOf[PipelineManagerActor], filesgateConfiguration), name = actorName)
-      case PipelineInstanceActor.NAME =>
-        context.actorOf(Props.create(classOf[PipelineInstanceActor], filesgateConfiguration), name = actorName)
-      case Download.DEFAULT_STEP_NAME =>
-        // We must create the default Download service
-        implicit val tool: Tools = tools
-        val service: PipelineStepService = new Download()
-        context.actorOf(Props.create(classOf[PipelineStepActor], ec, service).withMailbox("priority-stashed-actor"))
-      case Storage.DEFAULT_STEP_NAME =>
-        // We must create the default Storage actor + selected service (for now, only MongoDB, but afterwards another one can be created)
-        implicit val dbService: StorageContentApi = new MongoContent(filesgateConfiguration, tools)
-        val service: PipelineStepService = new Storage()
-        context.actorOf(Props.create(classOf[PipelineStepActor], ec, service).withMailbox("priority-stashed-actor"))
-      case Metadata.DEFAULT_STEP_NAME =>
-        // We must create the default Metadata actor + selected service (for now, only MongoDB, but afterwards another one can be created)
-        implicit val dbService: StorageMetadataApi = new MongoMetadata(filesgateConfiguration, tools)
-        val service: PipelineStepService = new Metadata()
-        context.actorOf(Props.create(classOf[PipelineStepActor], ec, service).withMailbox("priority-stashed-actor"))
-      case FailureHandling.DEFAULT_STEP_NAME =>
-        // We must create the default FailureHandling actor + selected service (for now, only MongoDB, but afterwards another one can be created)
-        // Note that we use the same service as the one for the metadata, there is no reason to have a different one
-        implicit val dbService: StorageMetadataApi = new MongoMetadata(filesgateConfiguration, tools)
-        val service: PipelineStepService = new FailureHandling()
-        context.actorOf(Props.create(classOf[PipelineStepActor], ec, service).withMailbox("priority-stashed-actor"))
-      case x =>
-        // We try to find if the workertypeid is linked to a PipelineStep
-        if(pipelineWorkerTypeInfo.exists(_.workerTypeId == workerTypeId)) {
-          instantiatePipelineStep(workerTypeId, actorName)
-        } else {
-          logger.debug(s"The $workerTypeId is not known in the EngineLeader of filesgate, this is probably a WorkerType from the user.")
-          startUserWorker(workerTypeId, actorName)
+    val relatedStepAndPipeline = findStepForWorkerTypeId(workerTypeId)
+
+    // The name for a pipeline step is ${pipelineId}.${stepName} even if $stepName is "Core.Metadata"
+    relatedStepAndPipeline match {
+      case Some(stepAndPipeline) =>
+        val pipeline = stepAndPipeline._1
+        val step = stepAndPipeline._2
+        val rawStep = step.name.split("\\:").last.split("\\.", 2)
+
+        rawStep.last match {
+          case Download.DEFAULT_STEP_NAME =>
+            // We must create the default Download service
+            val service: PipelineStepService = new Download(tools)
+            context.actorOf(Props.create(classOf[PipelineStepActor], ec, service).withMailbox("priority-stashed-actor"))
+          case Storage.DEFAULT_STEP_NAME =>
+            // We must create the default Storage actor + selected service (for now, only MongoDB, but afterwards another one can be created)
+            val dbService: StorageContentApi = instantiateStorageContentService(step.dbServiceName.get)
+            val service: PipelineStepService = new Storage(dbService)
+            context.actorOf(Props.create(classOf[PipelineStepActor], ec, service).withMailbox("priority-stashed-actor"))
+          case Metadata.DEFAULT_STEP_NAME =>
+            // We must create the default Metadata actor + selected service (for now, only MongoDB, but afterwards another one can be created)
+            val dbService: StorageMetadataApi = instantiateStorageMetadataService(step.dbServiceName.get)
+            val service: PipelineStepService = new Metadata(dbService)
+            context.actorOf(Props.create(classOf[PipelineStepActor], ec, service).withMailbox("priority-stashed-actor"))
+          case FailureHandling.DEFAULT_STEP_NAME =>
+            // We must create the default FailureHandling actor + selected service (for now, only MongoDB, but afterwards another one can be created)
+            // Note that we use the same service as the one for the metadata, there is no reason to have a different one
+            val dbService: StorageMetadataApi = instantiateStorageMetadataService(step.dbServiceName.get)
+            val service: PipelineStepService = new FailureHandling(dbService)
+            context.actorOf(Props.create(classOf[PipelineStepActor], ec, service).withMailbox("priority-stashed-actor"))
+          case x =>
+            // We try to find if the workertypeid is linked to a PipelineStep
+            if(pipelineWorkerTypeInfo.exists(_.workerTypeId == workerTypeId)) {
+              instantiatePipelineStep(workerTypeId, actorName)
+            } else {
+              throw new Exception(s"We could not find the related WorkerTypeInfo for $workerTypeId...")
+            }
+        }
+      case None =>
+        // This is a more classical pipeline step
+        workerTypeId match {
+          case EngineActor.name =>
+            context.actorOf(Props.create(classOf[EngineActor], engine, filesgateConfiguration), name = actorName)
+          case PipelineManagerActor.NAME =>
+            context.actorOf(Props.create(classOf[PipelineManagerActor], filesgateConfiguration), name = actorName)
+          case PipelineInstanceActor.NAME =>
+            context.actorOf(Props.create(classOf[PipelineInstanceActor], filesgateConfiguration), name = actorName)
+          case x =>
+            logger.debug(s"The $workerTypeId is not known in the EngineLeader of filesgate, this is probably a WorkerType from the user.")
+            startUserWorker(workerTypeId, actorName)
         }
     }
+  }
+
+  /**
+    * Find the Step for a given WorkerTypeId. Necessary to get the appropriate service for a metadata, storage, ... step
+    */
+  def findStepForWorkerTypeId(workerTypeId: String): Option[(PipelineMetadata, Step)] = {
+    val fullStepName = Communication.fullActorName(EngineLeader.COMPONENT, EngineLeader.PACKAGE, workerTypeId)
+
+    filesgateConfiguration.pipelines.flatMap(pipeline => pipeline.steps.map(step => (pipeline, step))).find(x => {
+      x._2.name == fullStepName
+    })
   }
 
   /**
@@ -141,6 +168,36 @@ abstract class EngineLeader @Inject()(engine: Engine,
       })
     })
   }
+
+  /**
+    * Start any storage content service
+    */
+  final def instantiateStorageContentService(dbService: String): StorageContentApi = {
+    dbService match {
+      case "Core.MongoContent" => new MongoContent(filesgateConfiguration, tools)
+      case other => startStorageContentService(dbService)
+    }
+  }
+
+  /**
+    * Start any storage metadata service
+    */
+  final def instantiateStorageMetadataService(dbService: String): StorageMetadataApi = {
+    dbService match {
+      case "Core.MongoMetadata" => new MongoMetadata(filesgateConfiguration, tools)
+      case other => startStorageMetadataService(dbService)
+    }
+  }
+
+  /**
+    * Can be implemented by the developer, to instantiate a specific db service
+    */
+  def startStorageContentService(dbService: String): StorageContentApi = ???
+
+  /**
+    * Can be implemented by the developer, to instantiate a specific db service
+    */
+  def startStorageMetadataService(dbService: String): StorageMetadataApi = ???
 
   /**
     * Must be implemented by the developer, for the pipeline step

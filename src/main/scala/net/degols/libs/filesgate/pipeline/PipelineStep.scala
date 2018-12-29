@@ -6,7 +6,7 @@ import net.degols.libs.filesgate.utils.Step
 
 trait PipelineStep {
   val TYPE: String = "Unknown"
-  val MANDATORY: Boolean = false
+  val IMPORTANT_STEP: Boolean = false
 
   val DEFAULT_STEP_NAME: String = "Unknown"
   /**

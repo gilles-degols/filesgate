@@ -27,7 +27,7 @@ trait StorageApi extends PipelineStepService {
   final override def process(message: Any): Any = process(message.asInstanceOf[StorageMessage])
 }
 
-class Storage(implicit val ec: ExecutionContext, dbService: StorageContentApi) extends StorageApi {
+class Storage(dbService: StorageContentApi)(implicit val ec: ExecutionContext) extends StorageApi {
   private val logger: Logger = LoggerFactory.getLogger(getClass)
 
   override def process(storeMessage: StorageMessage): Future[StorageMessage] = {
@@ -39,7 +39,7 @@ class Storage(implicit val ec: ExecutionContext, dbService: StorageContentApi) e
 
 object Storage extends PipelineStep {
   override val TYPE: String = "storage"
-  override val MANDATORY: Boolean = true
+  override val IMPORTANT_STEP: Boolean = true
   override val DEFAULT_STEP_NAME: String = "Core.Storage"
   override val defaultStep: Option[Step] = {
     val fullStepName = Communication.fullActorName(EngineLeader.COMPONENT, EngineLeader.PACKAGE, DEFAULT_STEP_NAME)

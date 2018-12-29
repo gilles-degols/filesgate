@@ -38,6 +38,12 @@ case class Step(tpe: String, name: String, loadBalancerType: LoadBalancerType) {
     */
   var processingTimeout: Duration = 1000 millis
 
+  /**
+    * Optional db service name to use for the step. It can be used for the Storage
+    * @return
+    */
+  var dbServiceName: Option[String] = None
+
   override def toString: String = s"Step($tpe, $name, $loadBalancerType)"
 }
 case class PipelineMetadata(id: String, steps: List[Step], private val config: Config) {
@@ -109,26 +115,6 @@ class FilesgateConfiguration @Inject()(val defaultConfig: Config)(implicit val f
   val startWorkerTimeout: FiniteDuration = config.getInt("cluster.start-worker-timeout-ms") millis
 
   /**
-    * Is the default metadata storage activated?
-    */
-  val isStoreMetadataActivated: Boolean = config.getBoolean("filesgate.storage.metadata.activate")
-
-  /**
-    * Is the default failureHandling activated (in metadata)?
-    */
-  val isStoreFailureActivated: Boolean = config.getBoolean("filesgate.storage.failurehandling.activate")
-
-  /**
-    * Is the default content storage activated ?
-    */
-  val isStoreContentActivated: Boolean = config.getBoolean("filesgate.storage.content.activate")
-
-  /**
-    * Is the default download activated ?
-    */
-  val isDownloadActivated: Boolean = config.getBoolean("filesgate.download.activate")
-
-  /**
     * Default timeout between every pipeline step (it can be overrided step-per-step)
     */
   val timeoutBetweenPipelineSteps: Duration = config.getLong("filesgate.internal.pipeline.timeout-step-ms") millis
@@ -187,6 +173,13 @@ class FilesgateConfiguration @Inject()(val defaultConfig: Config)(implicit val f
                               val loadBalancerType: LoadBalancerType = LoadBalancerType.loadFromConfig(rawStep.getConfig("balancer"))
                               val step = Step(tpe, name, loadBalancerType)
                               step.processingTimeout = Try{rawStep.getLong("timeout-step-ms") millis}.getOrElse(timeoutBetweenPipelineSteps)
+                              step.dbServiceName = Try{Option(rawStep.getString("db-service"))}.getOrElse(None)
+
+                              // Check to be sure that the user set the appropriate config
+                              if(step.dbServiceName.isEmpty && (step.tpe == Metadata.TYPE || step.tpe == Storage.TYPE || step.tpe == FailureHandling.TYPE)) {
+                                throw new Exception(s"Missing db-service information for step $rawNameWithPipeline.")
+                              }
+
                               step
                             })
 
@@ -217,35 +210,9 @@ class FilesgateConfiguration @Inject()(val defaultConfig: Config)(implicit val f
           None
         } else if (matchingSteps.nonEmpty) {
           matchingSteps.headOption
-        } else if(stepType.MANDATORY) {
-          val defaultStep = if(stepType.TYPE == Download.TYPE && Download.defaultStep.isDefined) {
-            logger.debug("No specific step for the download phase, use the default one.")
-            if(isDownloadActivated) Download.defaultStep
-            else None
-          } else if(stepType.TYPE == Storage.TYPE && Storage.defaultStep.isDefined) {
-            logger.debug("No specific step for the storage phase, use the default one.")
-            if(isStoreContentActivated) Storage.defaultStep
-            else None
-          } else if(stepType.TYPE == Metadata.TYPE && Metadata.defaultStep.isDefined) {
-            logger.debug("No specific step for the metadata phase, use the default one.")
-            if(isStoreMetadataActivated) Metadata.defaultStep
-            else None
-          } else if(stepType.TYPE == FailureHandling.TYPE && FailureHandling.defaultStep.isDefined) {
-            logger.debug("No specific step for the failure handling phase, use the default one.")
-            if(isStoreFailureActivated) FailureHandling.defaultStep
-            else None
-          } else {
-            logger.error(s"Missing mandatory step for ${pipelineId}: ${stepType.TYPE}. Abort.")
-            throw new Exception("Invalid pipeline configuration.")
-            None
-          }
-
-          // We add some additional info in the default step
-          if(defaultStep.isDefined) {
-            defaultStep.get.processingTimeout = timeoutBetweenPipelineSteps
-          }
-
-          defaultStep
+        } else if(stepType.IMPORTANT_STEP) {
+          logger.warn(s"No specific step for the ${stepType.TYPE} phase, you must add it manually or use a default one.")
+          None
         } else { // Normal behavior, nothing to add
           None
         }

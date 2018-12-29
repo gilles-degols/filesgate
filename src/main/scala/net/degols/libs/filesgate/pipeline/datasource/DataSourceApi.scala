@@ -24,5 +24,5 @@ class DataSource extends DataSourceApi {
 
 object DataSource extends PipelineStep {
   override val TYPE: String = "datasource"
-  override val MANDATORY: Boolean = true
+  override val IMPORTANT_STEP: Boolean = true
 }
