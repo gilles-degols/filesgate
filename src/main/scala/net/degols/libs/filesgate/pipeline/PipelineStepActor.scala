@@ -16,6 +16,7 @@ import scala.concurrent.{ExecutionContext, Future}
   */
 class PipelineStepActor(implicit val ec: ExecutionContext, pipelineStepService: PipelineStepService) extends PriorityStashedActor {
   private val logger: Logger = LoggerFactory.getLogger(getClass)
+  override protected val maximumRunningMessages: Int = 1
 
   var pipelineInstanceActor: Option[ActorRef] = None
 

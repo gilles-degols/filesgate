@@ -33,16 +33,17 @@ class PipelineGraphSpec extends TestKit(ActorSystem("MySpec")) with MockitoSugar
   var filesgateConfiguration: FilesgateConfiguration = new FilesgateConfiguration(config)
 
   // Default pipeline to work on. But, we might use another one depending on the use case
+  var stepConfig = ConfigFactory.parseString("""""")
   var steps: List[Step] = List(
-    Step(DataSource.TYPE, "Component:Package:test.datasource", BasicLoadBalancerType(1, ClusterInstance)),
-    Step(Matcher.TYPE, "Component:Package:test.matcher", BasicLoadBalancerType(1, ClusterInstance)),
-    Step(PreDownload.TYPE, "Component:Package:test.predownload", BasicLoadBalancerType(1, ClusterInstance)),
-    Step(Download.TYPE, "Component:Package:test.download", BasicLoadBalancerType(1, ClusterInstance)),
-    Step(PreStorage.TYPE, "Component:Package:test.prestorage", BasicLoadBalancerType(1, ClusterInstance)),
-    Step(Storage.TYPE, "Component:Package:test.storage", BasicLoadBalancerType(1, ClusterInstance)),
-    Step(PreMetadata.TYPE, "Component:Package:test.premetadata", BasicLoadBalancerType(1, ClusterInstance)),
-    Step(Metadata.TYPE, "Component:Package:test.metadata", BasicLoadBalancerType(1, ClusterInstance)),
-    Step(PostMetadata.TYPE, "Component:Package:test.postmetadata", BasicLoadBalancerType(1, ClusterInstance))
+    Step(DataSource.TYPE, "Component:Package:test.datasource", BasicLoadBalancerType(1, ClusterInstance), stepConfig),
+    Step(Matcher.TYPE, "Component:Package:test.matcher", BasicLoadBalancerType(1, ClusterInstance), stepConfig),
+    Step(PreDownload.TYPE, "Component:Package:test.predownload", BasicLoadBalancerType(1, ClusterInstance), stepConfig),
+    Step(Download.TYPE, "Component:Package:test.download", BasicLoadBalancerType(1, ClusterInstance), stepConfig),
+    Step(PreStorage.TYPE, "Component:Package:test.prestorage", BasicLoadBalancerType(1, ClusterInstance), stepConfig),
+    Step(Storage.TYPE, "Component:Package:test.storage", BasicLoadBalancerType(1, ClusterInstance), stepConfig),
+    Step(PreMetadata.TYPE, "Component:Package:test.premetadata", BasicLoadBalancerType(1, ClusterInstance), stepConfig),
+    Step(Metadata.TYPE, "Component:Package:test.metadata", BasicLoadBalancerType(1, ClusterInstance), stepConfig),
+    Step(PostMetadata.TYPE, "Component:Package:test.postmetadata", BasicLoadBalancerType(1, ClusterInstance), stepConfig)
   )
   var pipelineConfig = ConfigFactory.parseString("""""")
   var pipelineMetadata: PipelineMetadata = PipelineMetadata("test", steps, pipelineConfig)

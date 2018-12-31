@@ -3,6 +3,7 @@ package net.degols.libs.filesgate.pipeline.prestorage
 import net.degols.libs.filesgate.orm.{FileContent, FileMetadata}
 import net.degols.libs.filesgate.pipeline.download.DownloadMessage
 import net.degols.libs.filesgate.pipeline.{AbortStep, PipelineStep, PipelineStepMessage, PipelineStepService}
+import net.degols.libs.filesgate.utils.DownloadedFile
 import org.slf4j.{Logger, LoggerFactory}
 import play.api.libs.json.JsObject
 
@@ -14,10 +15,10 @@ import scala.concurrent.{ExecutionContext, Future}
   * @param abortStorage if this value is received, we do not go any next pre-storage stage
   */
 @SerialVersionUID(0L)
-case class PreStorageMessage(override val fileMetadata: FileMetadata, override val abort: Option[AbortStep], fileContent: Option[FileContent]) extends PipelineStepMessage(fileMetadata, abort)
+case class PreStorageMessage(override val fileMetadata: FileMetadata, override val abort: Option[AbortStep], downloadedFile: Option[DownloadedFile]) extends PipelineStepMessage(fileMetadata, abort)
 
 object PreStorageMessage {
-  def from(downloadMessage: DownloadMessage): PreStorageMessage = PreStorageMessage(downloadMessage.fileMetadata, downloadMessage.abort, downloadMessage.fileContent)
+  def from(downloadMessage: DownloadMessage): PreStorageMessage = PreStorageMessage(downloadMessage.fileMetadata, downloadMessage.abort, downloadMessage.downloadedFile)
 }
 
 /**

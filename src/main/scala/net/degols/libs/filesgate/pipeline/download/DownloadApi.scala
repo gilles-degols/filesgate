@@ -1,16 +1,25 @@
 package net.degols.libs.filesgate.pipeline.download
 
+import java.io.{File, FileWriter}
+import java.net.URL
+import java.nio.file.Path
+
+import akka.stream.scaladsl.Source
+import akka.util.ByteString
 import net.degols.libs.cluster.Tools
 import net.degols.libs.cluster.messages.{BasicLoadBalancerType, ClusterInstance, Communication}
 import net.degols.libs.filesgate.core.EngineLeader
 import net.degols.libs.filesgate.orm.{FileContent, FileMetadata}
 import net.degols.libs.filesgate.pipeline.predownload.PreDownloadMessage
 import net.degols.libs.filesgate.pipeline.{AbortStep, PipelineStep, PipelineStepMessage, PipelineStepService}
-import net.degols.libs.filesgate.utils.{Step, Tools}
+import net.degols.libs.filesgate.utils.{DownloadedFile, Step, Tools}
+import org.apache.commons.io.FileUtils
+import org.joda.time.DateTime
 import org.slf4j.{Logger, LoggerFactory}
 import play.api.libs.json.{JsObject, Json}
 
 import scala.concurrent.{ExecutionContext, Future}
+import scala.util.{Failure, Success, Try}
 
 
 /**
@@ -18,7 +27,7 @@ import scala.concurrent.{ExecutionContext, Future}
   * @param fileMetadata
   */
 @SerialVersionUID(0L)
-case class DownloadMessage(override val fileMetadata: FileMetadata, override val abort: Option[AbortStep], fileContent: Option[FileContent]) extends PipelineStepMessage(fileMetadata, abort)
+case class DownloadMessage(override val fileMetadata: FileMetadata, override val abort: Option[AbortStep], downloadedFile: Option[DownloadedFile]) extends PipelineStepMessage(fileMetadata, abort)
 
 object DownloadMessage {
   def from(preDownloadMessage: PreDownloadMessage): DownloadMessage = DownloadMessage(preDownloadMessage.fileMetadata, preDownloadMessage.abort, None)
@@ -43,16 +52,21 @@ trait DownloadApi extends PipelineStepService {
 class Download(tools: Tools)(implicit val ec: ExecutionContext) extends DownloadApi{
   private val logger: Logger = LoggerFactory.getLogger(getClass)
 
-  /**
-    * @param downloadMessage
-    * @return
-    */
   override def process(downloadMessage: DownloadMessage): Future[DownloadMessage] = {
     logger.info(s"Should download ${downloadMessage.fileMetadata.url}. Time is ${Tools.datetime()}")
 
-    tools.downloadFileInMemory(downloadMessage.fileMetadata.url).map(rawDownloadFile => {
+    // Download the file in itsef. Maybe to disk or in memory, it depends of the step configuration
+    val work: Future[DownloadedFile] = step.get.directory match {
+      case Some(dir) => // We must download the file to the disk (slow, but does not use a lot of RAM & GC)
+        val name = dir+"/download-file-"+downloadMessage.fileMetadata.id
+        tools.downloadFileToDisk(downloadMessage.fileMetadata.url, name)
+      case None => // We must download the file in memory (fast, but use a lot of RAM & GC)
+        tools.downloadFileInMemory(downloadMessage.fileMetadata.url)
+    }
+
+    // Now we format the pretty message
+    val res = work.map(rawDownloadFile => {
       val duration = rawDownloadFile.end.getTime - rawDownloadFile.start.getTime
-      val fileContent = new FileContent(downloadMessage.fileMetadata.id, rawDownloadFile.content.get)
       val downloadMetadata = Json.obj(
         "download_time" -> Json.obj("$date" -> rawDownloadFile.start.getTime),
         "download_duration_ms" -> duration,
@@ -60,8 +74,10 @@ class Download(tools: Tools)(implicit val ec: ExecutionContext) extends Download
       )
       downloadMessage.fileMetadata.downloaded = true
       downloadMessage.fileMetadata.metadata = downloadMessage.fileMetadata.metadata ++ downloadMetadata
-      DownloadMessage(downloadMessage.fileMetadata, downloadMessage.abort, Option(fileContent))
+      DownloadMessage(downloadMessage.fileMetadata, downloadMessage.abort, Option(rawDownloadFile))
     })
+
+    res
   }
 }
 
@@ -70,9 +86,4 @@ object Download extends PipelineStep{
   override val TYPE: String = "download"
   override val IMPORTANT_STEP: Boolean = true
   override val DEFAULT_STEP_NAME: String = "Core.Download"
-  override val defaultStep: Option[Step] = {
-    val fullStepName = Communication.fullActorName(EngineLeader.COMPONENT, EngineLeader.PACKAGE, DEFAULT_STEP_NAME)
-    val step = Step(TYPE, fullStepName, BasicLoadBalancerType(1, ClusterInstance))
-    Option(step)
-  }
 }

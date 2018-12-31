@@ -44,8 +44,4 @@ object FailureHandling extends PipelineStep{
   override val TYPE: String = "failurehandling"
   override val IMPORTANT_STEP: Boolean = true
   override val DEFAULT_STEP_NAME: String = "Core.FailureHandling"
-  override val defaultStep: Option[Step] = {
-    val fullStepName = Communication.fullActorName(EngineLeader.COMPONENT, EngineLeader.PACKAGE, DEFAULT_STEP_NAME)
-    Option(Step(TYPE, fullStepName, BasicLoadBalancerType(1, ClusterInstance)))
-  }
 }

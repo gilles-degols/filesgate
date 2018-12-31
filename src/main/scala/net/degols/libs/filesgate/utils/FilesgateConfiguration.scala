@@ -32,7 +32,7 @@ import scala.util.Try
   * @param name full name to the actor
   * @param maxInstances
   */
-case class Step(tpe: String, name: String, loadBalancerType: LoadBalancerType) {
+case class Step(tpe: String, name: String, loadBalancerType: LoadBalancerType, private val config: Config) {
   /**
     * Maximum timeout for the step processing. This value is overrided by FilesgateConfiguration in any case.
     */
@@ -42,7 +42,13 @@ case class Step(tpe: String, name: String, loadBalancerType: LoadBalancerType) {
     * Optional db service name to use for the step. It can be used for the Storage
     * @return
     */
-  var dbServiceName: Option[String] = None
+  val dbServiceName: Option[String] = Try{Option(config.getString("db-service"))}.getOrElse(None)
+
+  /**
+    * This information is only useful for the DownloadStep as of now. If the directory is given, we store
+    * downloaded files in the given repository. They must be manually cleaned by the Storage step.
+    */
+  val directory: Option[String] =  Try{Option(config.getString("directory"))}.getOrElse(None)
 
   override def toString: String = s"Step($tpe, $name, $loadBalancerType)"
 }
@@ -171,9 +177,8 @@ class FilesgateConfiguration @Inject()(val defaultConfig: Config)(implicit val f
                               val name = Communication.fullActorName(EngineLeader.COMPONENT, EngineLeader.PACKAGE, rawNameWithPipeline)
 
                               val loadBalancerType: LoadBalancerType = LoadBalancerType.loadFromConfig(rawStep.getConfig("balancer"))
-                              val step = Step(tpe, name, loadBalancerType)
+                              val step = Step(tpe, name, loadBalancerType, rawStep)
                               step.processingTimeout = Try{rawStep.getLong("timeout-step-ms") millis}.getOrElse(timeoutBetweenPipelineSteps)
-                              step.dbServiceName = Try{Option(rawStep.getString("db-service"))}.getOrElse(None)
 
                               // Check to be sure that the user set the appropriate config
                               if(step.dbServiceName.isEmpty && (step.tpe == Metadata.TYPE || step.tpe == Storage.TYPE || step.tpe == FailureHandling.TYPE)) {

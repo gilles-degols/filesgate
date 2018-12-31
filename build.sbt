@@ -7,7 +7,7 @@ scalacOptions ++= Seq("-deprecation", "-feature", "-language:postfixOps")
 
 scalaVersion := "2.12.1"
 lazy val playVersion = "2.6.1"
-lazy val akkaVersion = "2.5.2"
+lazy val akkaVersion = "2.5.6"
 
 libraryDependencies += "com.google.inject" % "guice" % "3.0"
 

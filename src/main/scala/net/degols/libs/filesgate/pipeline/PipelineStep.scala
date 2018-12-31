@@ -9,10 +9,6 @@ trait PipelineStep {
   val IMPORTANT_STEP: Boolean = false
 
   val DEFAULT_STEP_NAME: String = "Unknown"
-  /**
-    * Default step if it is mandatory for the pipeline, like the Download step
-    */
-  val defaultStep: Option[Step] = None
 }
 
 /**

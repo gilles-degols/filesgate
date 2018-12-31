@@ -122,7 +122,7 @@ abstract class PriorityStashedActor(implicit ec: ExecutionContext) extends Actor
 
         // We only remove running messages if there are waiting messages
         if(messagesToRemove.nonEmpty && customStash.values.map(_.size).sum > 0) {
-          logger.error(s"$id: GarbageCollector must remove ${messagesToRemove.size} old messages. Please investigate or increase maximumTimeProcessingMs (value is ${maximumTimeProcessingMs} ms). Existing messages: ${runningMessages.values.toList}")
+          logger.error(s"$id: GarbageCollector must remove ${messagesToRemove.size} old messages. Please investigate or increase maximumTimeProcessingMs (value is ${maximumTimeProcessingMs} ms). Existing messages: ${runningMessages.values.size}")
           messagesToRemove.foreach(messageWrapper => {
            runningMessages.remove(messageWrapper._1)
           })
@@ -132,14 +132,14 @@ abstract class PriorityStashedActor(implicit ec: ExecutionContext) extends Actor
         super.aroundReceive(receive, x.message)
 
       case xWrapper: FinishedProcessing =>
-        logger.debug(s"$id: Received FinishedProcessing message: ${xWrapper}")
+        logger.debug(s"$id: Received FinishedProcessing message.")
 
         // Remove the message from the processing
         if(runningMessages.contains(uid(xWrapper.message))) {
           // We only remove the first occurrence, as we could have multiple time the same message
           runningMessages.remove(uid(xWrapper.message))
         } else {
-          logger.error(s"$id: Tried to remove message ${uid(xWrapper.message)}: ${uid(xWrapper.message)} but we did not find it in the running messages: ${runningMessages.keys}.")
+          logger.error(s"$id: Tried to remove message but we did not find it in the running messages: ${runningMessages.keys}.")
         }
 
         // Check if we should process the next message, but according to their priority
@@ -166,13 +166,13 @@ abstract class PriorityStashedActor(implicit ec: ExecutionContext) extends Actor
         // Only send the order if there are less than x futures running at the same time
         val stashedElement = StashedElement(message, sender(), new DateTime().getMillis)
         if(runningMessages.size < maximumRunningMessages) {
-          logger.debug(s"$id: Directly process message ${uid(x)}: ${message} from ${sender()} to ${self}")
+          logger.debug(s"$id: Directly process message ${uid(x)} from ${sender()} to ${self}")
           runningMessages.put(uid(message), stashedElement)
 
           // We directly received the message, no need to re-send an intermediate message, we can execute it directly with the correct sender() information
           super.aroundReceive(receive, message)
         } else {
-          logger.debug(s"$id: Waiting to process message ${uid(message)}: ${message} from ${sender()} to ${self} as we have ${runningMessages.size} running messages.")
+          logger.debug(s"$id: Waiting to process message ${uid(message)} from ${sender()} to ${self} as we have ${runningMessages.size} running messages.")
           val priority = message match {
             case fsMessage: PriorityStashedMessage => fsMessage.priority
             case otherMessage => Int.MaxValue
@@ -205,12 +205,12 @@ abstract class PriorityStashedActor(implicit ec: ExecutionContext) extends Actor
         case Failure(exception) => Success("Failure")
       }.map(res => {
         val currentDate = new DateTime()
-        logger.debug(s"$id: Finish processing of ${message.hashCode()}: $message at $currentDate")
+        logger.debug(s"$id: Finish processing of ${message.hashCode()} at $currentDate")
         self ! FinishedProcessing(message)
       })
     } else {
       val currentDate = new DateTime()
-      logger.debug(s"$id: Finish processing of ${message.hashCode()}: $message at $currentDate")
+      logger.debug(s"$id: Finish processing of ${message.hashCode()} at $currentDate")
       self ! FinishedProcessing(message)
     }
   }

@@ -52,9 +52,5 @@ object Metadata extends PipelineStep {
   override val TYPE: String = "metadata"
   override val IMPORTANT_STEP: Boolean = true
   override val DEFAULT_STEP_NAME: String = "Core.Metadata"
-  override val defaultStep: Option[Step] = {
-    val fullStepName = Communication.fullActorName(EngineLeader.COMPONENT, EngineLeader.PACKAGE, DEFAULT_STEP_NAME)
-    Option(Step(TYPE, fullStepName, BasicLoadBalancerType(1, ClusterInstance)))
-  }
 }
 

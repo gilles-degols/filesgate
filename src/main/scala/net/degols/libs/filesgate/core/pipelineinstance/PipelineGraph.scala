@@ -22,6 +22,7 @@ import net.degols.libs.filesgate.pipeline.premetadata.{PreMetadata, PreMetadataM
 import net.degols.libs.filesgate.pipeline.prestorage.{PreStorage, PreStorageMessage}
 import net.degols.libs.filesgate.pipeline.storage.{Storage, StorageMessage}
 import net.degols.libs.filesgate.utils.{FilesgateConfiguration, PipelineMetadata, Step}
+import org.joda.time.DateTime
 import org.slf4j.{Logger, LoggerFactory}
 import play.api.libs.concurrent.Futures
 import play.api.libs.concurrent.Futures._
@@ -48,6 +49,16 @@ class PipelineGraph(filesgateConfiguration: FilesgateConfiguration) {
 
   var pipelineMetadata: PipelineMetadata = _
   var stepStatus: List[PipelineStepStatus] = _
+
+  /**
+    * Start time of the stream
+    */
+  private var _streamStartTime: Option[DateTime] = None
+
+  /**
+    * Number of processed messages since the last _streamStartTime
+    */
+  private var _processedMessages: Long = 0L
 
   /**
     * Contains the graph created by loadGraph
@@ -81,6 +92,10 @@ class PipelineGraph(filesgateConfiguration: FilesgateConfiguration) {
     val failureHandling = loadFailureHandlingSteps()
     val sink = loadSinkSteps()
 
+    // For stats
+    _streamStartTime = Option(new DateTime())
+    _processedMessages = 0
+
     // Now that we have raw flows, we need to add intermediate steps to convert the data
     _stream = source
       .map(m => PipelineStepMessageWrapper(MatcherMessage.from(m), None))
@@ -92,6 +107,15 @@ class PipelineGraph(filesgateConfiguration: FilesgateConfiguration) {
       .via(preMetadata)
       .via(metadata)
       .via(postMetadata)
+      .map(m => {
+          _processedMessages += 1
+          if(_processedMessages % 500 == 0) {
+            val diff = new DateTime().getMillis - _streamStartTime.get.getMillis
+            val speed: Long = math.round(_processedMessages / (diff / 1000.0))
+            logger.info(s"${pipelineMetadata.id}: ${_processedMessages} messages in ${diff / 1000L} seconds ($speed messages/s).")
+          }
+          m
+      })
       .via(failureHandling)
       .runWith(sink)
 
@@ -102,8 +126,7 @@ class PipelineGraph(filesgateConfiguration: FilesgateConfiguration) {
     * Load the sink steps
     */
   def loadSinkSteps(): Sink[Any, Future[Done]] = {
-    //Sink.ignore
-    Sink.foreach(x => logger.debug(s"Sink ignore: $x"))
+    Sink.ignore
   }
 
   /**
@@ -143,7 +166,8 @@ class PipelineGraph(filesgateConfiguration: FilesgateConfiguration) {
     flowStep.map(m => {
       m.failure match {
         case Some(err) => m
-        case None => PipelineStepMessageWrapper(PreStorageMessage.from(m.originalMessage.asInstanceOf[DownloadMessage]), None)
+        case None =>
+          PipelineStepMessageWrapper(PreStorageMessage.from(m.originalMessage.asInstanceOf[DownloadMessage]), None)
       }
     })
   }
@@ -275,7 +299,7 @@ class PipelineGraph(filesgateConfiguration: FilesgateConfiguration) {
             logger.debug(s"Pipeline graph step: message ${failure.initialMessage} is a previous failure, skip the crurent step")
             Future{m}
           case None =>
-            logger.debug(s"Pipeline graph step: send message $m")
+            logger.debug(s"Pipeline graph step: send message ${m}")
             (pipelineStepStatus.actorRef.get ? m.originalMessage).withTimeout(timeout.duration._1 millis)
               .map(_.asInstanceOf[PipelineStepMessage]).transformWith{
               // We receive a raw message or a failure, but we need to return a PipelineStepMessageWrapper in any case
