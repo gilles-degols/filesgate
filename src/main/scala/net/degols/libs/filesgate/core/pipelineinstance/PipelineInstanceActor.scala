@@ -2,7 +2,7 @@ package net.degols.libs.filesgate.core.pipelineinstance
 
 import akka.actor.{Actor, ActorRef, Kill, Terminated}
 import net.degols.libs.filesgate.core._
-import net.degols.libs.filesgate.utils.FilesgateConfiguration
+import net.degols.libs.filesgate.utils.{ActorStatistics, FilesgateConfiguration}
 import org.slf4j.{Logger, LoggerFactory}
 
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -65,6 +65,9 @@ class PipelineInstanceActor(filesgateConfiguration: FilesgateConfiguration) exte
         logger.debug(s"Got a Terminated($actorRef) from a PipelineStepActor.")
         pipelineInstance.diedActorRef(actorRef)
       }
+
+    case x: ActorStatistics =>
+      pipelineInstance.storeActorStatistics(sender(),x)
 
     case CheckPipelineStepState =>
       logger.debug("Received the order to CheckPipelineStepState, verify if we have enough workers to work on our pipeline instance.")

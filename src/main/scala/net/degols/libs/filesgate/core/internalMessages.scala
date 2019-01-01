@@ -1,7 +1,7 @@
 package net.degols.libs.filesgate.core
 
 import akka.actor.ActorRef
-import net.degols.libs.filesgate.utils.{PriorityStashedMessage, Step, UnknownPipelineStep}
+import net.degols.libs.filesgate.utils.{ActorStatistics, PriorityStashedMessage, Step, UnknownPipelineStep}
 
 /**
   * Every message sent to PipelineStepActor must extend this one. Any priority in [0;10[ is reserved for internal use of
@@ -118,6 +118,10 @@ case class PipelineStepStatus(step: Step, var pipelineInstanceId: String, var pi
   def setActorRef(actorRef: ActorRef): Unit = _actorRef = Option(actorRef)
   def removeActorRef(): Unit = _actorRef = None
   def actorRef: Option[ActorRef] = _actorRef
+
+  private var _actorStatistics: Option[ActorStatistics] = None
+  def setActorStatistics(actorStatistics: ActorStatistics): Unit = _actorStatistics = Option(actorStatistics)
+  def actorStatistics: Option[ActorStatistics] = _actorStatistics
 
   def isUnreachable: Boolean = {
     pipelineStepState == PipelineStepUnreachable || pipelineStepState == PipelineStepUnknown

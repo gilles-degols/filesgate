@@ -111,7 +111,7 @@ class PipelineGraph(filesgateConfiguration: FilesgateConfiguration) {
       .via(postMetadata)
       .map(m => {
           _processedMessages += 1
-          if(_processedMessages % 50 == 0) {
+          if(_processedMessages % 500 == 0) {
             val diff = new DateTime().getMillis - _streamStartTime.get.getMillis
             val speed: Long = math.round(_processedMessages / (diff / 1000.0))
             logger.info(s"${pipelineMetadata.id} / ${pipelineInstanceMetadata.numberId}: ${_processedMessages} messages in ${diff / 1000L} seconds ($speed messages/s).")

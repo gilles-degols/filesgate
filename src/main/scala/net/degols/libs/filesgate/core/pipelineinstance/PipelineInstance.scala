@@ -3,7 +3,7 @@ package net.degols.libs.filesgate.core.pipelineinstance
 import akka.actor.{ActorContext, ActorRef}
 import net.degols.libs.cluster.messages.Communication
 import net.degols.libs.filesgate.core._
-import net.degols.libs.filesgate.utils.{FilesgateConfiguration, PipelineInstanceMetadata, PipelineMetadata, Step}
+import net.degols.libs.filesgate.utils._
 import org.slf4j.{Logger, LoggerFactory}
 
 import scala.concurrent.ExecutionContext
@@ -113,6 +113,16 @@ class PipelineInstance(filesgateConfiguration: FilesgateConfiguration, val pipel
       launchWork()
     } else if(isGraphFinished) {
       logger.info(s"The PipelineInstance ${id.get} is finished successfully, we do not restart it.")
+    }
+
+    // We might want some statistics about the running steps
+    if(isGraphRunning) {
+      pipelineSteps.filter(_._2.pipelineInstanceId == id.get).values.map(stepStatus => {
+        Communication.sendWithoutReply(context.self, stepStatus.actorRef.get, GetActorStatistics())
+      })
+
+      // We display stats that we already have
+      logger.debug(s"Statistics for ${id}:\n${displayInstanceStatistics()}")
     }
 
     // TODO: We should try to find step in the same node, or even the same jvm if possible, that would reduce the inter-nodes
@@ -247,4 +257,41 @@ class PipelineInstance(filesgateConfiguration: FilesgateConfiguration, val pipel
     Communication.actorRefsForId(pipelineStepFullName).filterNot(knownActorRefs.contains)
   }
 
+  /**
+    * When we received the actorStatistics from a PipelineStep
+    */
+  def storeActorStatistics(sender: ActorRef, actorStatistics: ActorStatistics): Unit = {
+    pipelineSteps.get(sender.toString()) match {
+      case Some(stepStatus) =>
+        stepStatus.setActorStatistics(actorStatistics)
+      case None =>
+        logger.warn(s"Got statistics from an unknown sender: $sender")
+    }
+  }
+
+  /**
+    * Display instance statistics to ease the debug and increase performance
+    */
+  def displayInstanceStatistics(): String = {
+    val textMapping = pipelineSteps.values.filter(_.pipelineInstanceId == id.get).map(stepStatus => {
+      val startStepText = s"[${id.get}] ${stepStatus.step.name}"
+      val endStepText = stepStatus.actorStatistics match {
+        case Some(stats) =>
+          s"${stats.totalProcessedMessage} messages, ${math.round(stats.averageProcessingTime*100.0)/100.0} ms/message, last message @ ${stats.lastMessageDateTime}"
+        case None =>
+          "No statistics"
+      }
+      stepStatus.step.name -> s"$startStepText - $endStepText"
+    }).toMap
+
+    // To have the steps ordered correctly
+    pipelineInstanceMetadata.steps.map(step => {
+      textMapping.get(step.name) match {
+        case Some(text) => text
+        case None =>
+          logger.error(s"We did not find the related PipelineStepStatus for a given step (${step.name})...")
+          s"${step.name}: Missing information"
+      }
+    }).mkString("\n")
+  }
 }

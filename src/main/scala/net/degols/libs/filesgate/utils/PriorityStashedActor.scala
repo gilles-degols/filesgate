@@ -33,6 +33,9 @@ case class GarbageCollector() extends PriorityStashedMessage(5)
 @SerialVersionUID(0L)
 case class FinishedProcessing(message: Any) extends PriorityStashedMessage(5)
 
+@SerialVersionUID(0L)
+case class GetActorStatistics() extends PriorityStashedMessage(5)
+
 /**
   * Handle the priority of messages not yet in the custom stash. As we won't always have a fast execution of messages
   * (maybe someone decided to do an Await or Thread.sleep somewhere), we cannot really guarantee the priority of messages
@@ -48,12 +51,37 @@ final class PriorityStashedMailbox(settings: ActorSystem.Settings, config: Confi
 )
 
 /**
+  * Statistics about the PipelineStepActor (messages received, etc.). Those statistics are quite basic, you should
+  * use the Lightbend Telemetry or Kamon if you want more specific information.
+  */
+@SerialVersionUID(0L)
+class ActorStatistics(val actorRef: ActorRef) {
+  private var _lastMessageDateTime: DateTime = new DateTime()
+  def lastMessageDateTime: DateTime = _lastMessageDateTime
+
+  private var _totalProcessedMessages: Long = 0
+  def totalProcessedMessage: Long = _totalProcessedMessages
+
+  private var _averageProcessingTime: Double = 0.0
+  def averageProcessingTime: Double = _averageProcessingTime
+
+  def addProcessedMessage(executionTime: Long): Unit = {
+    _averageProcessingTime = _averageProcessingTime + (executionTime - _averageProcessingTime)*1.0 / (_totalProcessedMessages + 1.0)
+    _lastMessageDateTime = new DateTime()
+    _totalProcessedMessages += 1
+  }
+}
+
+
+/**
   * Implement an Actor with an home-made Stash with a (stable) priority queue. Its main goal is to provide a way to
   * have a service returning a future
   */
 abstract class PriorityStashedActor(implicit ec: ExecutionContext) extends Actor{
   case class StashedElement(message: Any, sender: ActorRef, creationTime: Long)
   case class ExecuteElementNow(message: Any)
+
+  private val actorStatistics: ActorStatistics = new ActorStatistics(self)
 
   /**
     * This id is only used to improve the debugging
@@ -128,6 +156,9 @@ abstract class PriorityStashedActor(implicit ec: ExecutionContext) extends Actor
           })
         }
 
+      case x: GetActorStatistics =>
+        sender() ! actorStatistics
+
       case x: ExecuteElementNow =>
         super.aroundReceive(receive, x.message)
 
@@ -135,11 +166,13 @@ abstract class PriorityStashedActor(implicit ec: ExecutionContext) extends Actor
         logger.debug(s"$id: Received FinishedProcessing message.")
 
         // Remove the message from the processing
-        if(runningMessages.contains(uid(xWrapper.message))) {
-          // We only remove the first occurrence, as we could have multiple time the same message
-          runningMessages.remove(uid(xWrapper.message))
-        } else {
-          logger.error(s"$id: Tried to remove message but we did not find it in the running messages: ${runningMessages.keys}.")
+        runningMessages.get(uid(xWrapper.message)) match {
+          case Some(previousMessage) =>
+            val diff = new DateTime().getMillis - previousMessage.creationTime
+            actorStatistics.addProcessedMessage(diff)
+            runningMessages.remove(uid(xWrapper.message))
+          case None =>
+            logger.error(s"$id: Tried to remove message but we did not find it in the running messages: ${runningMessages.keys}.")
         }
 
         // Check if we should process the next message, but according to their priority
