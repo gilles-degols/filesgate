@@ -2,7 +2,7 @@ package net.degols.libs.filesgate.core
 
 import java.util.concurrent.{ExecutorService, Executors}
 
-import akka.actor.{ActorRef, Props}
+import akka.actor.{ActorContext, ActorRef, ActorSystem, Props}
 import javax.inject.{Inject, Singleton}
 import net.degols.libs.cluster.ClusterConfiguration
 import net.degols.libs.cluster.core.Cluster
@@ -44,7 +44,6 @@ abstract class EngineLeader @Inject()(engine: Engine,
 
   val threadPool: ExecutorService = Executors.newFixedThreadPool(20)
   implicit val ec: ExecutionContextExecutor =  ExecutionContext.fromExecutor(threadPool)
-
   private val logger = LoggerFactory.getLogger(getClass)
 
   /**

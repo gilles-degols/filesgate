@@ -221,15 +221,12 @@ class FilesgateConfiguration @Inject()(val defaultConfig: Config)(implicit val f
   private def completePipelineSteps(pipelineId: String, userSteps: List[Step]): List[Step] = {
 
     // Complete the steps and directly order them correctly
+    // Important note: you need to be sure to keep the config order of the pipeline steps for a specific step
     val completeSteps: List[Step] = FilesgateConfiguration.PIPELINE_STEP_TYPES.flatMap {
       stepType => {
         val matchingSteps = userSteps.filter(_.tpe == stepType.TYPE)
-        if (matchingSteps.size > 1) {
-          logger.error(s"More than one step for ${pipelineId}: ${stepType.TYPE}. This is not yet supported. Abort.")
-          throw new Exception("Invalid pipeline configuration")
-          None
-        } else if (matchingSteps.nonEmpty) {
-          matchingSteps.headOption
+        if (matchingSteps.nonEmpty) {
+          Option(matchingSteps)
         } else if(stepType.IMPORTANT_STEP) {
           logger.warn(s"No specific step for the ${stepType.TYPE} phase, you must add it manually or use a default one.")
           None
@@ -237,7 +234,7 @@ class FilesgateConfiguration @Inject()(val defaultConfig: Config)(implicit val f
           None
         }
       }
-    }.toList
+    }.flatten
 
     completeSteps
   }
