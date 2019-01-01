@@ -26,10 +26,10 @@ class PipelineInstanceActor(filesgateConfiguration: FilesgateConfiguration) exte
 
   override def receive: Receive = {
     case x: PipelineInstanceToHandle => // This message is necessary to switch to the running state. It is sent by a PipelineManager
-      logger.debug("Received the pipeline id on which we should work on.")
-      pipelineInstance.setId(x.id)
+      logger.debug(s"Received the pipeline id on which we should work on (pipeline manager: ${x.pipelineManagerId} - pipeline instance number id: ${x.numberId}).")
+      pipelineInstance.setNumberId(x.numberId)
       pipelineInstance.setPipelineManagerId(x.pipelineManagerId)
-      sender() ! PipelineInstanceWorkingOn(x.id, x.pipelineManagerId)
+      sender() ! PipelineInstanceWorkingOn(x.numberId, x.pipelineManagerId)
 
       val frequency = filesgateConfiguration.checkPipelineStepState
       context.system.scheduler.schedule(frequency, frequency, self, CheckPipelineStepState)
@@ -48,7 +48,7 @@ class PipelineInstanceActor(filesgateConfiguration: FilesgateConfiguration) exte
     case x: PipelineInstanceToHandle =>
       // Every PipelineManagerActor will want that we work for them until they now that we are already working for other
       // pipeline. In this case, we do not change for whom we are working for, but we notify them of our current job.
-      sender() ! PipelineInstanceWorkingOn(pipelineInstance.id.get, pipelineInstance.pipelineManagerId.get)
+      sender() ! PipelineInstanceWorkingOn(pipelineInstance.numberId.get, pipelineInstance.pipelineManagerId.get)
 
     case x: PipelineStepWorkingOn =>
       // A PipelineStep can decide to not work for a given PipelineManager for multiple reasons (too much work already, etc.)

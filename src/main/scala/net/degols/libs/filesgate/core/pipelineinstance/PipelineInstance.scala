@@ -3,7 +3,7 @@ package net.degols.libs.filesgate.core.pipelineinstance
 import akka.actor.{ActorContext, ActorRef}
 import net.degols.libs.cluster.messages.Communication
 import net.degols.libs.filesgate.core._
-import net.degols.libs.filesgate.utils.{FilesgateConfiguration, PipelineMetadata, Step}
+import net.degols.libs.filesgate.utils.{FilesgateConfiguration, PipelineInstanceMetadata, PipelineMetadata, Step}
 import org.slf4j.{Logger, LoggerFactory}
 
 import scala.concurrent.ExecutionContext
@@ -18,16 +18,24 @@ class PipelineInstance(filesgateConfiguration: FilesgateConfiguration, val pipel
   // Set by the PipelineInstanceActor when it is started
   var context: ActorContext = _
 
-  // Set by the PipelineInstanceActor once it has received a message from the EngineActor. Cannot be changed afterwards
-  private var _id: Option[String] = None
-  def setId(id: String): Unit = {
-    if(_id.isDefined) {
-      throw new Exception("The id of a PipelineInstance cannot be changed once initialized!")
-    } else {
-      _id = Option(id)
+  def id: Option[String] = {
+    numberId match {
+      case Some(numId) =>
+        Option(s"${pipelineManagerId.get}-$numId")
+      case None => None
     }
   }
-  def id: Option[String] = _id
+
+  // Set by the PipelineInstanceActor once it has received a message from the EngineActor. Cannot be changed afterwards
+  private var _numberId: Option[Int] = None
+  def setNumberId(numberId: Int): Unit = {
+    if(_numberId.isDefined) {
+      throw new Exception("The number-id of a PipelineInstance cannot be changed once initialized!")
+    } else {
+      _numberId = Option(numberId)
+    }
+  }
+  def numberId: Option[Int] = _numberId
 
   private var _pipelineManagerId: Option[String] = None
   def setPipelineManagerId(pipelineManagerId: String): Unit = {
@@ -67,6 +75,9 @@ class PipelineInstance(filesgateConfiguration: FilesgateConfiguration, val pipel
   // Last incremental id for the PipelineStep that we want to use
   var pipelineStepLastId: Long = 0L
 
+  lazy val pipelineInstanceMetadata: PipelineInstanceMetadata = pipelineMetadata.pipelineInstancesMetadata.find(_.numberId == numberId.get).get
+
+
   /**
     * Verify if we have a PipelineStatus Waiting/Running for a given step
     * @param step
@@ -95,7 +106,7 @@ class PipelineInstance(filesgateConfiguration: FilesgateConfiguration, val pipel
     */
   def checkEveryPipelineStepStatus(): Unit = {
     // TODO: In very specific case, we might use a bit more PipelineInstances than we should (if we sent the message and before receiving a result we sent the message to another actor)
-    val missingSteps = pipelineMetadata.steps.filterNot(isStepFullFilled)
+    val missingSteps = pipelineInstanceMetadata.steps.filterNot(isStepFullFilled)
 
     if(missingSteps.isEmpty && !isGraphRunning && !isGraphFinished) {
       logger.info(s"We have all PipelineSteps necessary to start our PipelineInstance ${id.get}, we try to create the graph.")
@@ -114,7 +125,7 @@ class PipelineInstance(filesgateConfiguration: FilesgateConfiguration, val pipel
       val instanceToContact = Random.shuffle(freePipelineStepActors(step.name)).headOption
       instanceToContact match {
         case Some(act) =>
-          logger.debug(s"Try to contact a PipelineStep to see if it can handle ourselves '${id.get}'")
+          logger.debug(s"Try to contact a PipelineStep to see if it can handle ourselves '${id.get}', we want it to work on step: $step")
 
           // Unique id
           val pipelineStepId: String = s"${id.get}-${pipelineStepLastId}"
@@ -157,7 +168,7 @@ class PipelineInstance(filesgateConfiguration: FilesgateConfiguration, val pipel
 
     // We load the graph, then we check the stream to be sure to relaunch it if it fails / finish (the stream is not
     // supposed to finish)
-    pipelineGraph.loadGraph(pipelineMetadata, pipelineSteps)
+    pipelineGraph.loadGraph(pipelineMetadata, pipelineInstanceMetadata, pipelineSteps)
 
     val stream = pipelineGraph.stream()
     if(stream == null) {

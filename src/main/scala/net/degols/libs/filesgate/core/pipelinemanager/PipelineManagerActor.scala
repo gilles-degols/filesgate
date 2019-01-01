@@ -63,7 +63,7 @@ class PipelineManagerActor(filesgateConfiguration: FilesgateConfiguration) exten
       }
 
     case x: PipelineInstanceWorkingOn =>
-      logger.debug(s"A PipelineInstance indicated that it is working on ${x.pipelineManagerId}")
+      logger.debug(s"A PipelineInstance indicated that it is working on ${x.pipelineManagerId} (instance: ${x.numberId})")
       pipelineManager.ackFromPipelineInstance(sender(), x)
 
     case Terminated(actorRef) =>

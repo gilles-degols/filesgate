@@ -44,9 +44,10 @@ case class PipelineManagerWorkingOn(id: String) extends EngineInternalMessage
 
 /**
   * Message from the PipelineManagerActor to a PipelineInstanceActor saying for which PipelineManager he should work on.
-  * @param id
+  * @param numberId just an integer starting at 0 for every pipeline. To have a complete id you should merge the pipelineManagerId
+  *                 with the numberId
   */
-case class PipelineInstanceToHandle(id: String, pipelineManagerId: String) extends EngineInternalMessage
+case class PipelineInstanceToHandle(numberId: Int, pipelineManagerId: String) extends EngineInternalMessage
 
 /**
   * Reply by a PipelineInstance to the EngineActor saying on which id it is working (based on the PipelineInstanceToHandle
@@ -54,7 +55,7 @@ case class PipelineInstanceToHandle(id: String, pipelineManagerId: String) exten
   * PipelineManager
   * @param id
   */
-case class PipelineInstanceWorkingOn(id: String, pipelineManagerId: String) extends EngineInternalMessage
+case class PipelineInstanceWorkingOn(numberId: Int, pipelineManagerId: String) extends EngineInternalMessage
 
 
 /**
@@ -93,7 +94,7 @@ case object PipelineInstanceUnreachable extends PipelineInstanceState
 case object PipelineInstanceWaiting extends PipelineInstanceState
 case object PipelineInstanceRunning extends PipelineInstanceState
 
-case class PipelineInstanceStatus(var pipelineManagerId: Option[String], var state: PipelineInstanceState) extends EngineInternalMessage {
+case class PipelineInstanceStatus(var pipelineManagerId: Option[String], var state: PipelineInstanceState, var numberId: Option[Int]) extends EngineInternalMessage {
   private var _actorRef: Option[ActorRef] = None
   def setActorRef(actorRef: ActorRef): Unit = _actorRef = Option(actorRef)
   def removeActorRef(): Unit = _actorRef = None

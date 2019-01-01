@@ -19,7 +19,7 @@ import net.degols.libs.filesgate.pipeline.predownload.PreDownload
 import net.degols.libs.filesgate.pipeline.premetadata.PreMetadata
 import net.degols.libs.filesgate.pipeline.prestorage.PreStorage
 import net.degols.libs.filesgate.pipeline.storage.Storage
-import net.degols.libs.filesgate.utils.{FilesgateConfiguration, PipelineMetadata, Step}
+import net.degols.libs.filesgate.utils.{FilesgateConfiguration, PipelineInstanceMetadata, PipelineMetadata, Step}
 import org.mockito.ArgumentMatchers
 import org.mockito.Mockito._
 import org.scalatest._
@@ -46,7 +46,8 @@ class PipelineGraphSpec extends TestKit(ActorSystem("MySpec")) with MockitoSugar
     Step(PostMetadata.TYPE, "Component:Package:test.postmetadata", BasicLoadBalancerType(1, ClusterInstance), stepConfig)
   )
   var pipelineConfig = ConfigFactory.parseString("""""")
-  var pipelineMetadata: PipelineMetadata = PipelineMetadata("test", steps, pipelineConfig)
+  val pipelineInstancesMetadata = List(PipelineInstanceMetadata(0, steps))
+  var pipelineMetadata: PipelineMetadata = PipelineMetadata("test", pipelineInstancesMetadata, pipelineConfig)
   var pipelineSteps: Map[String, PipelineStepStatus] = constructPipelineSteps(steps)
   var pipelineGraph: PipelineGraph = new PipelineGraph(filesgateConfiguration)
   pipelineGraph.pipelineMetadata = pipelineMetadata

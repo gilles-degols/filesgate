@@ -21,7 +21,7 @@ import net.degols.libs.filesgate.pipeline.predownload.{PreDownload, PreDownloadM
 import net.degols.libs.filesgate.pipeline.premetadata.{PreMetadata, PreMetadataMessage}
 import net.degols.libs.filesgate.pipeline.prestorage.{PreStorage, PreStorageMessage}
 import net.degols.libs.filesgate.pipeline.storage.{Storage, StorageMessage}
-import net.degols.libs.filesgate.utils.{FilesgateConfiguration, PipelineMetadata, Step}
+import net.degols.libs.filesgate.utils.{FilesgateConfiguration, PipelineInstanceMetadata, PipelineMetadata, Step}
 import org.joda.time.DateTime
 import org.slf4j.{Logger, LoggerFactory}
 import play.api.libs.concurrent.Futures
@@ -48,6 +48,7 @@ class PipelineGraph(filesgateConfiguration: FilesgateConfiguration) {
   implicit val futures: Futures = filesgateConfiguration.futures
 
   var pipelineMetadata: PipelineMetadata = _
+  var pipelineInstanceMetadata: PipelineInstanceMetadata = _
   var stepStatus: List[PipelineStepStatus] = _
 
   /**
@@ -74,9 +75,10 @@ class PipelineGraph(filesgateConfiguration: FilesgateConfiguration) {
 
   def constructSource(source: Source[FileMetadata, NotUsed]): Source[FileMetadata, NotUsed] = ???
 
-  def loadGraph(pipelineMetadata: PipelineMetadata, pipelineSteps: Map[String, PipelineStepStatus]): Unit = {
+  def loadGraph(pipelineMetadata: PipelineMetadata, pipelineInstanceMetadata: PipelineInstanceMetadata, pipelineSteps: Map[String, PipelineStepStatus]): Unit = {
     implicit val materializer = ActorMaterializer()
     this.pipelineMetadata = pipelineMetadata
+    this.pipelineInstanceMetadata = pipelineInstanceMetadata
     this.stepStatus = pipelineSteps.values.toList
 
     // Various elements of the graph
@@ -109,10 +111,10 @@ class PipelineGraph(filesgateConfiguration: FilesgateConfiguration) {
       .via(postMetadata)
       .map(m => {
           _processedMessages += 1
-          if(_processedMessages % 500 == 0) {
+          if(_processedMessages % 50 == 0) {
             val diff = new DateTime().getMillis - _streamStartTime.get.getMillis
             val speed: Long = math.round(_processedMessages / (diff / 1000.0))
-            logger.info(s"${pipelineMetadata.id}: ${_processedMessages} messages in ${diff / 1000L} seconds ($speed messages/s).")
+            logger.info(s"${pipelineMetadata.id} / ${pipelineInstanceMetadata.numberId}: ${_processedMessages} messages in ${diff / 1000L} seconds ($speed messages/s).")
           }
           m
       })
@@ -330,7 +332,7 @@ class PipelineGraph(filesgateConfiguration: FilesgateConfiguration) {
     * Return the Steps for a given type, and other information (actor ref, ...)
     */
   def stepWrappersFromType(tpe: String): List[(Step, PipelineStepStatus)] = {
-    pipelineMetadata.steps.filter(_.tpe == tpe).flatMap(step => {
+    pipelineInstanceMetadata.steps.filter(_.tpe == tpe).flatMap(step => {
       stepStatus.find(_.step.name == step.name) match {
         case Some(stat) =>
           Option((step, stat))

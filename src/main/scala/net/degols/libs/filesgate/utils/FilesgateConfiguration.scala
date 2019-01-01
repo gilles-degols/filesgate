@@ -52,8 +52,11 @@ case class Step(tpe: String, name: String, loadBalancerType: LoadBalancerType, p
 
   override def toString: String = s"Step($tpe, $name, $loadBalancerType)"
 }
-case class PipelineMetadata(id: String, steps: List[Step], private val config: Config) {
-  // Max number of pipeline instances
+
+case class PipelineInstanceMetadata(numberId: Int, steps: List[Step])
+
+case class PipelineMetadata(id: String, pipelineInstancesMetadata: List[PipelineInstanceMetadata], private val config: Config) {
+  // Max number of pipeline instances (this object is just one instance of them)
   val instances: Int = Try{config.getInt("pipeline-instance.quantity")}.getOrElse(1)
 
   // Should we restart the pipeline if the stream finish successfully ?
@@ -155,7 +158,8 @@ class FilesgateConfiguration @Inject()(val defaultConfig: Config)(implicit val f
 
   /**
     * The various pipelines defined in the configuration.
-    * This must remain a lazy val as we don't have the EngineLeader.component / EngineLeader.package at boot
+    * This must remain a lazy val as we don't have the EngineLeader.component / EngineLeader.package at boot.
+    * We have multiple PipelineMetadata for each instance of a Pipeline, to ease the manipulation
     */
   lazy val pipelines: List[PipelineMetadata] = {
     if(EngineLeader.COMPONENT == null || EngineLeader.PACKAGE == null) {
@@ -163,36 +167,47 @@ class FilesgateConfiguration @Inject()(val defaultConfig: Config)(implicit val f
     }
 
     val set: List[(String, ConfigValue)] = config.getObject("filesgate.pipelines").asScala.toList
-    val res = set map {
+    val res = set.map{
       case (key, value) =>
         val id = key
         val currentPipeline: Config = value.asInstanceOf[ConfigObject].toConfig
+        val quantity = Try{currentPipeline.getInt("pipeline-instance.quantity")}.getOrElse(1)
 
-        val steps: List[Step] = currentPipeline.getConfigList("steps").asScala.toList
-                            .map(rawStep => {
-                              val tpe = rawStep.getString("type")
-                              val rawName = rawStep.getString("name")
-                              // We might want to add the current Component/Package & the pipeline id in the step name
-                              val rawNameWithPipeline: String = if(rawName.startsWith(id+".")) rawName else s"$id.$rawName"
-                              val name = Communication.fullActorName(EngineLeader.COMPONENT, EngineLeader.PACKAGE, rawNameWithPipeline)
+        val instancesMetadata = (0 until quantity).map(instanceNumber => {
+          val steps: List[Step] = currentPipeline.getConfigList("steps").asScala.toList
+            .map(rawStep => {
+              val tpe = rawStep.getString("type")
+              val rawName = rawStep.getString("name")
+              // We might want to add the current Component/Package & the pipeline id in the step name
+              val rawNameWithPipeline: String = if(rawName.startsWith(id+".")) {
+                val n = rawName.split(".").drop(1)
+                s"$id.$instanceNumber.$n"
+              } else {
+                s"$id.$instanceNumber.$rawName"
+              }
 
-                              val loadBalancerType: LoadBalancerType = LoadBalancerType.loadFromConfig(rawStep.getConfig("balancer"))
-                              val step = Step(tpe, name, loadBalancerType, rawStep)
-                              step.processingTimeout = Try{rawStep.getLong("timeout-step-ms") millis}.getOrElse(timeoutBetweenPipelineSteps)
+              val name = Communication.fullActorName(EngineLeader.COMPONENT, EngineLeader.PACKAGE, rawNameWithPipeline)
 
-                              // Check to be sure that the user set the appropriate config
-                              if(step.dbServiceName.isEmpty && (step.tpe == Metadata.TYPE || step.tpe == Storage.TYPE || step.tpe == FailureHandling.TYPE)) {
-                                throw new Exception(s"Missing db-service information for step $rawNameWithPipeline.")
-                              }
+              val loadBalancerType: LoadBalancerType = LoadBalancerType.loadFromConfig(rawStep.getConfig("balancer"))
+              val step = Step(tpe, name, loadBalancerType, rawStep)
+              step.processingTimeout = Try{rawStep.getLong("timeout-step-ms") millis}.getOrElse(timeoutBetweenPipelineSteps)
 
-                              step
-                            })
+              // Check to be sure that the user set the appropriate config
+              if(step.dbServiceName.isEmpty && (step.tpe == Metadata.TYPE || step.tpe == Storage.TYPE || step.tpe == FailureHandling.TYPE)) {
+                throw new Exception(s"Missing db-service information for step $rawNameWithPipeline.")
+              }
 
-        // We add missing pipeline steps between the one defined by the user, and order them correctly
-        val allSteps = completePipelineSteps(id, steps)
+              step
+            })
 
-        logger.info(s"PipelineStep '$id': $allSteps")
-        PipelineMetadata(id, allSteps, currentPipeline)
+          // We add missing pipeline steps between the one defined by the user, and order them correctly
+          val allSteps = completePipelineSteps(id, steps)
+
+          logger.info(s"PipelineStep '$id': $allSteps")
+          PipelineInstanceMetadata(instanceNumber, steps)
+        }).toList
+
+        PipelineMetadata(id, instancesMetadata, currentPipeline)
     }
 
     res

@@ -5,9 +5,10 @@ import javax.inject.Inject
 import net.degols.libs.cluster.messages.Communication
 import net.degols.libs.filesgate.core._
 import net.degols.libs.filesgate.core.pipelineinstance.PipelineInstanceActor
-import net.degols.libs.filesgate.utils.{FilesgateConfiguration, PipelineMetadata}
+import net.degols.libs.filesgate.utils.{FilesgateConfiguration, PipelineInstanceMetadata, PipelineMetadata}
 import org.slf4j.{Logger, LoggerFactory}
 
+import scala.collection.mutable.ListBuffer
 import scala.util.{Failure, Random, Success, Try}
 
 /**
@@ -30,9 +31,6 @@ class PipelineManager @Inject()(filesgateConfiguration: FilesgateConfiguration) 
   }
   def id: Option[String] = _id
 
-  // Last incremental id for the PipelineInstance that we want to use
-  var pipelineInstanceLastId: Long = 0L
-
   /**
     * Metadata of the current pipeline manager.
     * Must remain a lazy val to be sure that we have the _id. And it should fail if we found no configuration for the pipeline.
@@ -50,6 +48,16 @@ class PipelineManager @Inject()(filesgateConfiguration: FilesgateConfiguration) 
   var pipelineInstances: Map[String, PipelineInstanceStatus] = Map.empty[String, PipelineInstanceStatus]
 
   /**
+    * Do we already have the pipelineInstance for a given number id?
+    */
+  def isPipelineInstanceFulfilledOrWaiting(numberId: Int): Boolean = pipelineInstances.values.exists(inst => {
+    inst.numberId.isDefined &&
+      inst.numberId.get == numberId &&
+      inst.pipelineManagerId.get == id.get &&
+      (inst.state == PipelineInstanceWaiting || inst.state == PipelineInstanceRunning)
+  })
+
+  /**
     * Check status of every PipelineInstance. From the Communication object we can detect how many PipelineInstance we have,
     * but we cannot use all of them, as other PipelineManagers also want to access a specific amount of PipelineInstance.
     * For now, to ease the work, we have a fix amount of PipelineInstances to start from the configuration.
@@ -64,37 +72,46 @@ class PipelineManager @Inject()(filesgateConfiguration: FilesgateConfiguration) 
     */
   def checkEveryPipelineInstanceStatus(): Unit = {
     // TODO: In very specific case, we might use a bit more PipelineInstances than we should (if we sent the message and before receiving a result we sent the message to another actor)
-    val maxInstances = pipelineMetadata.instances
-
-    val missingInstances = maxInstances - pipelineInstances.values.filter(_.pipelineManagerId.isDefined).filter(_.pipelineManagerId.get == id.get).filterNot(_.isUnreachable).size
 
     // We try to detect the available instances based on the Communication system
     val unknownInstances = freePipelineInstanceActors().map(actorRef => {
-      val p = PipelineInstanceStatus(None, PipelineInstanceUnreachable)
+      val p = PipelineInstanceStatus(None, PipelineInstanceUnreachable, None)
       p.setActorRef(actorRef)
       p
     })
 
-    // We take all instances which we didn't identify yet, or if they didn't reply yet
-    val unreachableInstances: List[PipelineInstanceStatus] = pipelineInstances.values
+    // We take all instances which we didn't identify yet, or if they didn't reply yet, and we shuffle them
+    val unreachableInstances: ListBuffer[PipelineInstanceStatus] = Random.shuffle(pipelineInstances.values
       .filter(status => status.pipelineManagerId.isEmpty || status.pipelineManagerId.get == id.get)
-      .filter(_.isUnreachable).toList ::: unknownInstances
+      .filter(_.isUnreachable).toList ::: unknownInstances).to[ListBuffer]
 
-    // By taking some random instances, we increase our chances to have some responsive one
-    val instancesToContact = Random.shuffle(unreachableInstances).take(missingInstances)
-
-    instancesToContact.foreach(instanceStatus => {
-      logger.debug(s"Try to contact a PipelineInstance to see if it can handle the pipeline manager '${id.get}'")
-
+    pipelineMetadata.pipelineInstancesMetadata
+      .filter(instanceMetadata => {
+        val res = !isPipelineInstanceFulfilledOrWaiting(instanceMetadata.numberId)
+        if(!res) {
+          logger.debug(s"Seems like the instance ${instanceMetadata.numberId} for ${id.get} is already fullfilled / in progress.")
+        }
+        res
+      })
+      .flatMap(instanceMetadata => {
+        // We take a first free / unreachable instance and remove it from the listbuffer
+        unreachableInstances.headOption match {
+          case Some(inst) =>
+            unreachableInstances.remove(0)
+            Some((instanceMetadata, inst))
+          case None =>
+            logger.warn("No PipelineInstance available for now.")
+            None
+        }
+    }).foreach{case (instanceMetadata: PipelineInstanceMetadata, instanceStatus: PipelineInstanceStatus) =>
       // The actor ref should always exist based on the code above
       val destActorRef = instanceStatus.actorRef.get
 
-      // Unique id
-      val pipelineInstanceId: String = s"${id.get}-${pipelineInstanceLastId}"
-      pipelineInstanceLastId += 1L
+      logger.debug(s"Try to contact a PipelineInstance ($destActorRef) to see if it can handle the pipeline manager '${id.get}' for instance number ${instanceMetadata.numberId}")
+
 
       Try {
-        val msg = PipelineInstanceToHandle(pipelineInstanceId, id.get)
+        val msg = PipelineInstanceToHandle(instanceMetadata.numberId, id.get)
         Communication.sendWithoutReply(context.self, destActorRef, msg)
         // We need to remember to which actor we sent the message, to be sure to not assign the work to anybody else
         instanceStatus.setActorRef(destActorRef)
@@ -112,7 +129,7 @@ class PipelineManager @Inject()(filesgateConfiguration: FilesgateConfiguration) 
         case Some(obj) => // Nothing to do, we had a reference
         case None => pipelineInstances = pipelineInstances ++ Map(destActorRef.toString() -> instanceStatus)
       }
-    })
+    }
   }
 
   /**
@@ -129,6 +146,7 @@ class PipelineManager @Inject()(filesgateConfiguration: FilesgateConfiguration) 
         } else {
           // The PipelineInstance can work on another PipelineManager, that's up to another method called frequently to
           // check if we have enough instances
+          status.numberId = Option(message.numberId)
           status.pipelineManagerId = Option(message.pipelineManagerId)
           status.state = PipelineInstanceWaiting
         }

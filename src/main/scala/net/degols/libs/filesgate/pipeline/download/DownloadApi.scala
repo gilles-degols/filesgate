@@ -19,7 +19,7 @@ import org.slf4j.{Logger, LoggerFactory}
 import play.api.libs.json.{JsObject, Json}
 
 import scala.concurrent.{ExecutionContext, Future}
-import scala.util.{Failure, Success, Try}
+import scala.util.{Failure, Random, Success, Try}
 
 
 /**
@@ -51,14 +51,19 @@ trait DownloadApi extends PipelineStepService {
 
 class Download(tools: Tools)(implicit val ec: ExecutionContext) extends DownloadApi{
   private val logger: Logger = LoggerFactory.getLogger(getClass)
+  protected val r = Random
 
   override def process(downloadMessage: DownloadMessage): Future[DownloadMessage] = {
     logger.info(s"Should download ${downloadMessage.fileMetadata.url}. Time is ${Tools.datetime()}")
 
+    // Random value to be sure to not have problems to download the same url on the same server
+    val rand = r.nextInt()
+
+
     // Download the file in itsef. Maybe to disk or in memory, it depends of the step configuration
     val work: Future[DownloadedFile] = step.get.directory match {
       case Some(dir) => // We must download the file to the disk (slow, but does not use a lot of RAM & GC)
-        val name = dir+"/download-file-"+downloadMessage.fileMetadata.id
+        val name = dir+"/download-file-"+rand+"-"+downloadMessage.fileMetadata.id
         tools.downloadFileToDisk(downloadMessage.fileMetadata.url, name)
       case None => // We must download the file in memory (fast, but use a lot of RAM & GC)
         tools.downloadFileInMemory(downloadMessage.fileMetadata.url)

@@ -56,12 +56,12 @@ abstract class EngineLeader @Inject()(engine: Engine,
   final override def startWorker(workerTypeId: String, actorName: String): ActorRef = {
     val relatedStepAndPipeline = findStepForWorkerTypeId(workerTypeId)
 
-    // The name for a pipeline step is ${pipelineId}.${stepName} even if $stepName is "Core.Metadata"
+    // The name for a pipeline step is ${pipelineId}.${pipelineNumberId}.${stepName} even if $stepName is "Core.Metadata"
     relatedStepAndPipeline match {
       case Some(stepAndPipeline) =>
         val pipeline = stepAndPipeline._1
         val step = stepAndPipeline._2
-        val rawStep = step.name.split("\\:").last.split("\\.", 2)
+        val rawStep = step.name.split("\\:").last.split("\\.", 3)
 
         rawStep.last match {
           case Download.DEFAULT_STEP_NAME =>
@@ -112,18 +112,25 @@ abstract class EngineLeader @Inject()(engine: Engine,
     * Find the Step for a given WorkerTypeId. Necessary to get the appropriate service for a metadata, storage, ... step
     */
   def findStepForWorkerTypeId(workerTypeId: String): Option[(PipelineMetadata, Step)] = {
+    // The workerTypeId we received contains the pipeline instance number, so we need to remove it
     val fullStepName = Communication.fullActorName(EngineLeader.COMPONENT, EngineLeader.PACKAGE, workerTypeId)
 
-    filesgateConfiguration.pipelines.flatMap(pipeline => pipeline.steps.map(step => (pipeline, step))).find(x => {
-      x._2.name == fullStepName
-    })
+    filesgateConfiguration.pipelines.map(pipeline => {
+      (pipeline, pipeline.pipelineInstancesMetadata.flatMap(_.steps.find(_.name == fullStepName)).headOption)
+    }).filter(_._2.isDefined).map(x => (x._1, x._2.get)).headOption
   }
 
   /**
     * Instantiate a PipelineInstanceStep with the related class
     */
   final def instantiatePipelineStep(workerTypeId: String, actorName: String): ActorRef = {
-    val service: PipelineStepService = startStepService(workerTypeId)
+    // We need to remove the pipeline instance number in the workerTypeId before giving it to the developer
+    var i = 0
+    val elems = workerTypeId.split("\\:").last.split("\\.").toList
+    val pipelineId = elems.head
+    val prettyStepName = pipelineId + "." + elems.drop(2).mkString(".")
+
+    val service: PipelineStepService = startStepService(prettyStepName)
     context.actorOf(Props.create(classOf[PipelineStepActor], ec, service).withMailbox("priority-stashed-actor"))
   }
 
@@ -160,10 +167,12 @@ abstract class EngineLeader @Inject()(engine: Engine,
     */
   final lazy val pipelineWorkerTypeInfo: List[WorkerTypeInfo] = {
     filesgateConfiguration.pipelines.flatMap(pipelineMetadata => {
-      pipelineMetadata.steps.map(step => {
-        // The step name is formatted that way: "Component:Package:PipelineId.StepName" and we need to remove the two first parts to only have a proper local name
-        val workerTypeId: String = step.name.split(":").drop(2).mkString(":")
-        WorkerTypeInfo(self, workerTypeId, step.loadBalancerType)
+      pipelineMetadata.pipelineInstancesMetadata.flatMap(met => {
+        met.steps.map(step => {
+          // The step name is formatted that way: "Component:Package:PipelineId.InstanceId.StepName" and we need to remove the two first parts to only have a proper local name
+          val stepName: String = step.name.split(":", 3).drop(2).last
+          WorkerTypeInfo(self, s"$stepName", step.loadBalancerType)
+        })
       })
     })
   }
