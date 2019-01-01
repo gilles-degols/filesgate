@@ -51,7 +51,7 @@ class PipelineGraphSpec extends TestKit(ActorSystem("MySpec")) with MockitoSugar
   var pipelineSteps: Map[String, PipelineStepStatus] = constructPipelineSteps(steps)
   var pipelineGraph: PipelineGraph = new PipelineGraph(filesgateConfiguration)
   pipelineGraph.pipelineMetadata = pipelineMetadata
-  pipelineGraph.stepStatus = pipelineSteps.values.toList
+  pipelineGraph.setPipelineStepStatuses(pipelineSteps.values.toList)
 
   var pipelineGraphMock: PipelineGraph = mock[PipelineGraph]
 

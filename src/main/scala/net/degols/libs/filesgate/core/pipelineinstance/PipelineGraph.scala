@@ -30,7 +30,7 @@ import play.api.libs.concurrent.Futures._
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.concurrent.duration._
-import scala.util.{Failure, Success}
+import scala.util.{Failure, Random, Success}
 
 /**
   * Specific object to pass failure between steps, to store them at the end of the stream
@@ -49,7 +49,8 @@ class PipelineGraph(filesgateConfiguration: FilesgateConfiguration) {
 
   var pipelineMetadata: PipelineMetadata = _
   var pipelineInstanceMetadata: PipelineInstanceMetadata = _
-  var stepStatus: List[PipelineStepStatus] = _
+  private var _pipelineStepStatuses: List[PipelineStepStatus] = _
+  def setPipelineStepStatuses(pipelineStepStatuses: List[PipelineStepStatus]): Unit = _pipelineStepStatuses = pipelineStepStatuses
 
   /**
     * Start time of the stream
@@ -75,11 +76,15 @@ class PipelineGraph(filesgateConfiguration: FilesgateConfiguration) {
 
   def constructSource(source: Source[FileMetadata, NotUsed]): Source[FileMetadata, NotUsed] = ???
 
-  def loadGraph(pipelineMetadata: PipelineMetadata, pipelineInstanceMetadata: PipelineInstanceMetadata, pipelineSteps: Map[String, PipelineStepStatus]): Unit = {
+  /**
+    * You need to call setPipelineStepStatuses() before calling this method
+    * @param pipelineMetadata
+    * @param pipelineInstanceMetadata
+    */
+  def loadGraph(pipelineMetadata: PipelineMetadata, pipelineInstanceMetadata: PipelineInstanceMetadata): Unit = {
     implicit val materializer = ActorMaterializer()
     this.pipelineMetadata = pipelineMetadata
     this.pipelineInstanceMetadata = pipelineInstanceMetadata
-    this.stepStatus = pipelineSteps.values.toList
 
     // Various elements of the graph
     val source: Source[FileMetadata, NotUsed] = loadSourceSteps()
@@ -136,7 +141,7 @@ class PipelineGraph(filesgateConfiguration: FilesgateConfiguration) {
     */
   def loadMatcherSteps(): Flow[PipelineStepMessageWrapper, PipelineStepMessageWrapper, NotUsed] = {
     val stepWrappers = stepWrappersFromType(tpe = Matcher.TYPE)
-    val flowStep: Flow[PipelineStepMessageWrapper, PipelineStepMessageWrapper, NotUsed] = loadAnySteps(stepWrappers.map(_._2))
+    val flowStep: Flow[PipelineStepMessageWrapper, PipelineStepMessageWrapper, NotUsed] = loadAnySteps(stepWrappers)
     flowStep.map(m => {
       m.failure match {
         case Some(err) => m
@@ -150,7 +155,7 @@ class PipelineGraph(filesgateConfiguration: FilesgateConfiguration) {
     */
   def loadPreDownloadSteps(): Flow[PipelineStepMessageWrapper, PipelineStepMessageWrapper, NotUsed] = {
     val stepWrappers = stepWrappersFromType(tpe = PreDownload.TYPE)
-    val flowStep = loadAnySteps(stepWrappers.map(_._2))
+    val flowStep = loadAnySteps(stepWrappers)
     flowStep.map(m => {
       m.failure match {
         case Some(err) => m
@@ -164,7 +169,7 @@ class PipelineGraph(filesgateConfiguration: FilesgateConfiguration) {
     */
   def loadDownloadSteps(): Flow[PipelineStepMessageWrapper, PipelineStepMessageWrapper, NotUsed] = {
     val stepWrappers = stepWrappersFromType(tpe = Download.TYPE)
-    val flowStep = loadAnySteps(stepWrappers.map(_._2))
+    val flowStep = loadAnySteps(stepWrappers)
     flowStep.map(m => {
       m.failure match {
         case Some(err) => m
@@ -179,7 +184,7 @@ class PipelineGraph(filesgateConfiguration: FilesgateConfiguration) {
     */
   def loadPreStorageSteps(): Flow[PipelineStepMessageWrapper, PipelineStepMessageWrapper, NotUsed] = {
     val stepWrappers = stepWrappersFromType(tpe = PreStorage.TYPE)
-    val flowStep = loadAnySteps(stepWrappers.map(_._2))
+    val flowStep = loadAnySteps(stepWrappers)
     flowStep.map(m => {
       m.failure match {
         case Some(err) => m
@@ -193,7 +198,7 @@ class PipelineGraph(filesgateConfiguration: FilesgateConfiguration) {
     */
   def loadStorageSteps(): Flow[PipelineStepMessageWrapper, PipelineStepMessageWrapper, NotUsed] = {
     val stepWrappers = stepWrappersFromType(tpe = Storage.TYPE)
-    val flowStep = loadAnySteps(stepWrappers.map(_._2))
+    val flowStep = loadAnySteps(stepWrappers)
     flowStep.map(m => {
       m.failure match {
         case Some(err) => m
@@ -207,7 +212,7 @@ class PipelineGraph(filesgateConfiguration: FilesgateConfiguration) {
     */
   def loadPreMetadataSteps(): Flow[PipelineStepMessageWrapper, PipelineStepMessageWrapper, NotUsed] = {
     val stepWrappers = stepWrappersFromType(tpe = PreMetadata.TYPE)
-    val flowStep = loadAnySteps(stepWrappers.map(_._2))
+    val flowStep = loadAnySteps(stepWrappers)
     flowStep.map(m => {
       m.failure match {
         case Some(err) => m
@@ -221,7 +226,7 @@ class PipelineGraph(filesgateConfiguration: FilesgateConfiguration) {
     */
   def loadMetadataSteps(): Flow[PipelineStepMessageWrapper, PipelineStepMessageWrapper, NotUsed] = {
     val stepWrappers = stepWrappersFromType(tpe = Metadata.TYPE)
-    val flowStep = loadAnySteps(stepWrappers.map(_._2))
+    val flowStep = loadAnySteps(stepWrappers)
     flowStep.map(m => {
       m.failure match {
         case Some(err) => m
@@ -235,7 +240,7 @@ class PipelineGraph(filesgateConfiguration: FilesgateConfiguration) {
     */
   def loadPostMetadataSteps(): Flow[PipelineStepMessageWrapper, PipelineStepMessageWrapper, NotUsed] = {
     val stepWrappers = stepWrappersFromType(tpe = PostMetadata.TYPE)
-    val flowStep = loadAnySteps(stepWrappers.map(_._2))
+    val flowStep = loadAnySteps(stepWrappers)
     // In this case, no need to convert the message, the only remaining step is to handle failure, so we can keep the raw messages
     flowStep
   }
@@ -245,7 +250,7 @@ class PipelineGraph(filesgateConfiguration: FilesgateConfiguration) {
     */
   def loadFailureHandlingSteps(): Flow[PipelineStepMessageWrapper, PipelineStepMessageWrapper, NotUsed] = {
     val stepWrappers = stepWrappersFromType(tpe = FailureHandling.TYPE)
-    val flowStep = loadAnySteps(stepWrappers.map(_._2))
+    val flowStep = loadAnySteps(stepWrappers)
     // For this particular step, we want to have the "failure" in the PipelineStepMessageWrapper as the message itself
     Flow[PipelineStepMessageWrapper].filter(_.failure.isDefined).map(m => {
       logger.debug("Prepare message for FailureHandling")
@@ -260,7 +265,8 @@ class PipelineGraph(filesgateConfiguration: FilesgateConfiguration) {
   private def loadSourceSteps(): Source[FileMetadata, NotUsed] = {
     // Ask for the Sources, then merge them together. See https://doc.akka.io/docs/akka/2.5/stream/operators/Source-or-Flow/merge.html
     // We could use a MergePrioritized for the priority queue
-    val sourceSteps = stepWrappersFromType(tpe = DataSource.TYPE).map(_._2)
+    // Note: For the source there is no load balancing available
+    val sourceSteps = stepWrappersFromType(tpe = DataSource.TYPE).flatMap(_._2)
     sourceSteps.map(pipelineStepStatus => {
       loadSource(pipelineStepStatus) match {
         case None => throw new Exception(s"Source $pipelineStepStatus cannot be found")
@@ -290,10 +296,12 @@ class PipelineGraph(filesgateConfiguration: FilesgateConfiguration) {
     * Load any type of steps and merge flows of the same type. If some steps are missing this is not a problem.
     * Only exception: source and sink
     */
-  private def loadAnySteps(pipelineStepStatuses: List[PipelineStepStatus]): Flow[PipelineStepMessageWrapper, PipelineStepMessageWrapper, NotUsed] = {
-    pipelineStepStatuses.map(pipelineStepStatus => {
+  private def loadAnySteps(pipelineStepAndStatuses: List[(Step, List[PipelineStepStatus])]): Flow[PipelineStepMessageWrapper, PipelineStepMessageWrapper, NotUsed] = {
+    pipelineStepAndStatuses.map(pipelineStepAndStatus => {
+      val step = pipelineStepAndStatus._1
+      val pipelineStepStatuses = pipelineStepAndStatus._2
       // timeout for the Ask pattern
-      implicit val timeout = Timeout(pipelineStepStatus.step.processingTimeout._1 millis)
+      implicit val timeout = Timeout(step.processingTimeout._1 millis)
 
       Flow[PipelineStepMessageWrapper].mapAsync(50)(m => {
         m.failure match {
@@ -301,7 +309,10 @@ class PipelineGraph(filesgateConfiguration: FilesgateConfiguration) {
             logger.debug(s"Pipeline graph step: message ${failure.initialMessage} is a previous failure, skip the crurent step")
             Future{m}
           case None =>
-            logger.debug(s"Pipeline graph step: send message ${m}")
+            // Select a random actorref to send the message. This is a stupid but efficient load balancing
+            val pipelineStepStatus = Random.shuffle(pipelineStepStatuses).head
+
+            logger.debug(s"Pipeline graph step: send message ${m} to $pipelineStepStatus")
             (pipelineStepStatus.actorRef.get ? m.originalMessage).withTimeout(timeout.duration._1 millis)
               .map(_.asInstanceOf[PipelineStepMessage]).transformWith{
               // We receive a raw message or a failure, but we need to return a PipelineStepMessageWrapper in any case
@@ -330,17 +341,16 @@ class PipelineGraph(filesgateConfiguration: FilesgateConfiguration) {
 
   /**
     * Return the Steps for a given type, and other information (actor ref, ...)
+    * We can have multiple Step for a given type. And each step can have multiple PipelineStepStatus if they need to work
+    * in parallel
     */
-  def stepWrappersFromType(tpe: String): List[(Step, PipelineStepStatus)] = {
-    pipelineInstanceMetadata.steps.filter(_.tpe == tpe).flatMap(step => {
-      stepStatus.find(_.step.name == step.name) match {
-        case Some(stat) =>
-          Option((step, stat))
-        case None =>
-          // Not all type are necessary, but if we are here, we should have found it in any case
-          logger.error(s"We did not find the pipeline step for a known type ${tpe}")
-          None
+  def stepWrappersFromType(tpe: String): List[(Step, List[PipelineStepStatus])] = {
+    pipelineInstanceMetadata.steps.filter(_.tpe == tpe).map(step => {
+      val matchingStepStatuses = _pipelineStepStatuses.filter(_.step.name == step.name)
+      if(matchingStepStatuses.isEmpty) {
+        logger.error(s"Missing step statuses for type $tpe and pipeline ${pipelineMetadata.id}")
       }
-    })
+      (step, matchingStepStatuses)
+    }).filter(_._2.nonEmpty)
   }
 }

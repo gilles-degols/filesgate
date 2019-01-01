@@ -1,6 +1,7 @@
 package net.degols.libs.filesgate.core.pipelineinstance
 
 import akka.actor.{ActorContext, ActorRef}
+import net.degols.libs.cluster.balancing.BasicLoadBalancer
 import net.degols.libs.cluster.messages.Communication
 import net.degols.libs.filesgate.core._
 import net.degols.libs.filesgate.utils._
@@ -79,13 +80,17 @@ class PipelineInstance(filesgateConfiguration: FilesgateConfiguration, val pipel
 
 
   /**
-    * Verify if we have a PipelineStatus Waiting/Running for a given step
+    * Verify if we have a PipelineStatus Waiting/Running for a given step. We do not care to have all the actor instances
+    * for a given pipeline step, only one available at a time is enough to start a Pipeline
     * @param step
     * @return
     */
   def isStepFullFilled(step: Step): Boolean = {
     // We filter by PipelineStep working for the current PipelineInstanceId
     // We need to look for pipeline step having the same "full name" as the one in the given "step" attribute
+
+    // We do not use the load balancer information here to find all actor ref, as the load balancer can create new actors
+    // at any time. So we simply use any actor available.
     pipelineSteps.values.filter(_.pipelineInstanceId == id.get).filter(_.step.name == step.name).exists(!_.isUnreachable)
   }
 
@@ -109,6 +114,7 @@ class PipelineInstance(filesgateConfiguration: FilesgateConfiguration, val pipel
     val missingSteps = pipelineInstanceMetadata.steps.filterNot(isStepFullFilled)
 
     if(missingSteps.isEmpty && !isGraphRunning && !isGraphFinished) {
+      // Note: we do not care if we do not have all the actors for a specific step, as long as we have 1 of them it's enough to start the graph.
       logger.info(s"We have all PipelineSteps necessary to start our PipelineInstance ${id.get}, we try to create the graph.")
       launchWork()
     } else if(isGraphFinished) {
@@ -120,43 +126,39 @@ class PipelineInstance(filesgateConfiguration: FilesgateConfiguration, val pipel
       pipelineSteps.filter(_._2.pipelineInstanceId == id.get).values.map(stepStatus => {
         Communication.sendWithoutReply(context.self, stepStatus.actorRef.get, GetActorStatistics())
       })
-
-      // We display stats that we already have
-      logger.debug(s"Statistics for ${id}:\n${displayInstanceStatistics()}")
     }
 
     // TODO: We should try to find step in the same node, or even the same jvm if possible, that would reduce the inter-nodes
     // bandwidth quite a lot, reduce the latency, and increase the availability. But sometimes it's not possible to have that,
     // so we should have a fallback, and also be ready to tear down a graph, and use other actors if they pop up
-    missingSteps.foreach(step => {
-      val missingInstances = pipelineSteps.values.filter(_.pipelineInstanceId == id.get).filter(_.isUnreachable)
-
-      // For now we only want 1 actor for each step
-      val instanceToContact = Random.shuffle(freePipelineStepActors(step.name)).headOption
-      instanceToContact match {
-        case Some(act) =>
-          logger.debug(s"Try to contact a PipelineStep to see if it can handle ourselves '${id.get}', we want it to work on step: $step")
-
-          // Unique id
-          val pipelineStepId: String = s"${id.get}-${pipelineStepLastId}"
-          pipelineStepLastId += 1L
-
-          Try {
-            val msg = PipelineStepToHandle(pipelineStepId, id.get, pipelineManagerId.get, step)
-            Communication.sendWithoutReply(context.self, act, msg)
-            // We will add the watcher when we receive the reply
-          } match {
-            case Success(res) => // Nothing to do
-            case Failure(err) =>
-              logger.warn(s"Impossible to send the work assignment to a PipelineInstance for ${id.get}")
-          }
-
-          // To make the code simpler, we don't add the PipelineStep to our local map for the moment, we'll wait for
-          // the reply to do that
-
-        case None =>
-          logger.warn(s"No PipelineStep available for PipelineInstance ${id.get} and the step: ${step.name}")
+    pipelineInstanceMetadata.steps.foreach(step => {
+      // Each step.name is linked to the appropriate Pipeline instance, and we need to use every available actor (we can have
+      // more than 1 actor/step)
+      val availableActors = freePipelineStepActors(step.name)
+      if(availableActors.isEmpty && !isStepFullFilled(step)) {
+        logger.warn(s"No PipelineStep available for PipelineInstance ${id.get} and the step: ${step.name}")
       }
+
+      availableActors.foreach(instanceToContact => {
+        logger.debug(s"Try to contact a PipelineStep to see if it can handle ourselves '${id.get}', we want it to work on step: $step")
+
+        // Unique id
+        val pipelineStepId: String = s"${id.get}-${pipelineStepLastId}"
+        pipelineStepLastId += 1L
+
+        Try {
+          val msg = PipelineStepToHandle(pipelineStepId, id.get, pipelineManagerId.get, step)
+          Communication.sendWithoutReply(context.self, instanceToContact, msg)
+          // We will add the watcher when we receive the reply
+        } match {
+          case Success(res) => // Nothing to do
+          case Failure(err) =>
+            logger.warn(s"Impossible to send the work assignment to a PipelineInstance for ${id.get}")
+        }
+
+        // To make the code simpler, we don't add the PipelineStep to our local map for the moment, we'll wait for
+        // the reply to do that
+      })
     })
   }
 
@@ -178,7 +180,8 @@ class PipelineInstance(filesgateConfiguration: FilesgateConfiguration, val pipel
 
     // We load the graph, then we check the stream to be sure to relaunch it if it fails / finish (the stream is not
     // supposed to finish)
-    pipelineGraph.loadGraph(pipelineMetadata, pipelineInstanceMetadata, pipelineSteps)
+    pipelineGraph.setPipelineStepStatuses(pipelineSteps.values.toList)
+    pipelineGraph.loadGraph(pipelineMetadata, pipelineInstanceMetadata)
 
     val stream = pipelineGraph.stream()
     if(stream == null) {
@@ -226,6 +229,9 @@ class PipelineInstance(filesgateConfiguration: FilesgateConfiguration, val pipel
               val status = PipelineStepStatus(message.step, id.get, PipelineStepWaiting)
               status.setActorRef(sender)
               pipelineSteps = pipelineSteps ++ Map(sender.toString() -> status)
+              // We need to update the PipelineGraph information, as it needs to use the new actor ref
+              pipelineGraph.setPipelineStepStatuses(pipelineSteps.values.toList)
+
             case Failure(err) => logger.error(s"Impossible to watch a PipelineStep($sender)")
           }
         } else {
@@ -244,7 +250,9 @@ class PipelineInstance(filesgateConfiguration: FilesgateConfiguration, val pipel
     val pipelineStep = pipelineSteps.get(actorRef.toString())
 
     pipelineStep match {
-      case Some(status) => pipelineSteps = pipelineSteps.filterKeys(_ != actorRef.toString())
+      case Some(status) =>
+        pipelineSteps = pipelineSteps.filterKeys(_ != actorRef.toString())
+        pipelineGraph.setPipelineStepStatuses(pipelineSteps.values.toList)
       case None => logger.error(s"Got a Terminated($actorRef) for an actor ref not linked to a known PipelineStep...")
     }
   }
@@ -272,26 +280,24 @@ class PipelineInstance(filesgateConfiguration: FilesgateConfiguration, val pipel
   /**
     * Display instance statistics to ease the debug and increase performance
     */
-  def displayInstanceStatistics(): String = {
-    val textMapping = pipelineSteps.values.filter(_.pipelineInstanceId == id.get).map(stepStatus => {
-      val startStepText = s"[${id.get}] ${stepStatus.step.name}"
-      val endStepText = stepStatus.actorStatistics match {
-        case Some(stats) =>
-          s"${stats.totalProcessedMessage} messages, ${math.round(stats.averageProcessingTime*100.0)/100.0} ms/message, last message @ ${stats.lastMessageDateTime}"
-        case None =>
-          "No statistics"
-      }
-      stepStatus.step.name -> s"$startStepText - $endStepText"
-    }).toMap
+  def displayInstanceStatistics(): Unit = {
+    if(isGraphRunning) {
+      // To have the steps ordered correctly we need to start from the step config
+      val text = pipelineInstanceMetadata.steps.map(step => {
+        pipelineSteps.values.filter(_.pipelineInstanceId == id.get).filter(_.step.name == step.name).map(stepStatus => {
+          val startStepText = s"[${id.get}] ${stepStatus.step.name}"
+          val endStepText = stepStatus.actorStatistics match {
+            case Some(stats) =>
+              s"${stats.totalProcessedMessage} messages, ${math.round(stats.averageProcessingTime*100.0)/100.0} ms/message, last message @ ${stats.lastMessageDateTime}"
+            case None =>
+              "No statistics"
+          }
+          s"$startStepText - $endStepText"
+        }).mkString("\n")
+      }).mkString("\n")
 
-    // To have the steps ordered correctly
-    pipelineInstanceMetadata.steps.map(step => {
-      textMapping.get(step.name) match {
-        case Some(text) => text
-        case None =>
-          logger.error(s"We did not find the related PipelineStepStatus for a given step (${step.name})...")
-          s"${step.name}: Missing information"
-      }
-    }).mkString("\n")
+      // We display stats that we already have
+      logger.debug(s"Statistics for ${id}:\n${text}")
+    }
   }
 }

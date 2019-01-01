@@ -4,10 +4,11 @@ import akka.actor.{Actor, ActorRef, Kill, Terminated}
 import net.degols.libs.filesgate.core._
 import net.degols.libs.filesgate.utils.{ActorStatistics, FilesgateConfiguration}
 import org.slf4j.{Logger, LoggerFactory}
-
+import scala.concurrent.duration._
 import scala.concurrent.ExecutionContext.Implicits.global
 
 case object CheckPipelineStepState
+case object DisplayActorStatistics
 
 /**
   * Handle one instance of a given pipeline
@@ -33,6 +34,9 @@ class PipelineInstanceActor(filesgateConfiguration: FilesgateConfiguration) exte
 
       val frequency = filesgateConfiguration.checkPipelineStepState
       context.system.scheduler.schedule(frequency, frequency, self, CheckPipelineStepState)
+
+      // No need to make the actor statistics configurable
+      context.system.scheduler.schedule(15 seconds, 15 seconds, self, DisplayActorStatistics)
 
       // We watch the PipelineManagerActor, if it dies, we should die to
       pipelineManagerActor = Option(sender())
@@ -68,6 +72,9 @@ class PipelineInstanceActor(filesgateConfiguration: FilesgateConfiguration) exte
 
     case x: ActorStatistics =>
       pipelineInstance.storeActorStatistics(sender(),x)
+
+    case DisplayActorStatistics =>
+      pipelineInstance.displayInstanceStatistics()
 
     case CheckPipelineStepState =>
       logger.debug("Received the order to CheckPipelineStepState, verify if we have enough workers to work on our pipeline instance.")
