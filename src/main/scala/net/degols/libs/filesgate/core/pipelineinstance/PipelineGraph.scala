@@ -3,7 +3,7 @@ package net.degols.libs.filesgate.core.pipelineinstance
 import akka.actor.ActorContext
 import akka.pattern.ask
 import akka.stream.ActorMaterializer
-import akka.stream.scaladsl.{Flow, Sink, Source}
+import akka.stream.scaladsl.{Flow, MergePrioritized, Sink, Source}
 import akka.util.Timeout
 import akka.{Done, NotUsed}
 import net.degols.libs.cluster.messages.Communication
@@ -267,12 +267,21 @@ class PipelineGraph(filesgateConfiguration: FilesgateConfiguration) {
     // We could use a MergePrioritized for the priority queue
     // Note: For the source there is no load balancing available
     val sourceSteps = stepWrappersFromType(tpe = DataSource.TYPE).flatMap(_._2)
-    sourceSteps.map(pipelineStepStatus => {
+    val rawSources: List[Source[FileMetadata, NotUsed]] = sourceSteps.map(pipelineStepStatus => {
       loadSource(pipelineStepStatus) match {
         case None => throw new Exception(s"Source $pipelineStepStatus cannot be found")
         case Some(s) => s
       }
-    }).reduceLeft(_.merge(_))
+    })
+
+    // Multiplying everything by 100, as it seems the priority is used to create a buffer: https://github.com/akka/akka/issues/25823
+    val priorityList: List[Int] = sourceSteps.map(_.step.priority*100)
+
+    val mergedSources: Source[FileMetadata, NotUsed] = if(rawSources.size == 1) rawSources.head
+    else if(rawSources.size == 2) Source.combine(rawSources.head, rawSources(1))(numInputs => MergePrioritized(priorityList))
+    else Source.combine(rawSources.head, rawSources(1), rawSources:_*)(numInputs => MergePrioritized(priorityList))
+
+    mergedSources
   }
 
   /**

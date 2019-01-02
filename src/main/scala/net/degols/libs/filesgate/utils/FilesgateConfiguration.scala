@@ -45,6 +45,11 @@ case class Step(tpe: String, name: String, loadBalancerType: LoadBalancerType, p
   val dbServiceName: Option[String] = Try{Option(config.getString("db-service"))}.getOrElse(None)
 
   /**
+    * Optional priority for step, only used for the source as of now.
+    */
+  val priority: Int = Try{config.getInt("priority")}.getOrElse(1)
+
+  /**
     * This information is only useful for the DownloadStep as of now. If the directory is given, we store
     * downloaded files in the given repository. They must be manually cleaned by the Storage step.
     */
