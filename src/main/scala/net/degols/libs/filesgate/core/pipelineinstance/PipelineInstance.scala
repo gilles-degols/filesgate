@@ -113,7 +113,7 @@ class PipelineInstance(filesgateConfiguration: FilesgateConfiguration, val pipel
     // TODO: In very specific case, we might use a bit more PipelineInstances than we should (if we sent the message and before receiving a result we sent the message to another actor)
     val missingSteps = pipelineInstanceMetadata.steps.filterNot(isStepFullFilled)
 
-    if(missingSteps.isEmpty && !isGraphRunning && !isGraphFinished) {
+    if(isGraphRunnable && !isGraphRunning && !isGraphFinished) {
       // Note: we do not care if we do not have all the actors for a specific step, as long as we have 1 of them it's enough to start the graph.
       logger.info(s"We have all PipelineSteps necessary to start our PipelineInstance ${id.get}, we try to create the graph.")
       launchWork()
@@ -163,6 +163,22 @@ class PipelineInstance(filesgateConfiguration: FilesgateConfiguration, val pipel
   }
 
   /**
+    * Verify if we can start a graph. For that we need a PipelineStepStatus for every step AND we need to be sure that
+    * we have at least a combination of Download / PreStorage / Storage StepStatus on one node (as those steps must always
+    * run together on the same node)
+    * Return true even if the graph is already running.
+    */
+  def isGraphRunnable: Boolean = {
+    val missingSteps = pipelineInstanceMetadata.steps.filterNot(isStepFullFilled)
+    if(missingSteps.nonEmpty) {
+      return false
+    }
+
+    // Now we still need to verify that we have a combination of Download / PreStorage / Storage steps
+    pipelineGraph.areActorsColocated()
+  }
+
+  /**
     * Check if the graph is already running, in that case there is no need to re-create it.
     */
   def isGraphRunning: Boolean = _graphIsRunning
@@ -180,8 +196,8 @@ class PipelineInstance(filesgateConfiguration: FilesgateConfiguration, val pipel
 
     // We load the graph, then we check the stream to be sure to relaunch it if it fails / finish (the stream is not
     // supposed to finish)
-    pipelineGraph.setPipelineStepStatuses(pipelineSteps.values.toList)
-    pipelineGraph.loadGraph(pipelineMetadata, pipelineInstanceMetadata)
+    setPipelineGraphConfig()
+    pipelineGraph.loadGraph()
 
     val stream = pipelineGraph.stream()
     if(stream == null) {
@@ -230,7 +246,8 @@ class PipelineInstance(filesgateConfiguration: FilesgateConfiguration, val pipel
               status.setActorRef(sender)
               pipelineSteps = pipelineSteps ++ Map(sender.toString() -> status)
               // We need to update the PipelineGraph information, as it needs to use the new actor ref
-              pipelineGraph.setPipelineStepStatuses(pipelineSteps.values.toList)
+              setPipelineGraphConfig()
+
 
             case Failure(err) => logger.error(s"Impossible to watch a PipelineStep($sender)")
           }
@@ -252,7 +269,7 @@ class PipelineInstance(filesgateConfiguration: FilesgateConfiguration, val pipel
     pipelineStep match {
       case Some(status) =>
         pipelineSteps = pipelineSteps.filterKeys(_ != actorRef.toString())
-        pipelineGraph.setPipelineStepStatuses(pipelineSteps.values.toList)
+        setPipelineGraphConfig()
       case None => logger.error(s"Got a Terminated($actorRef) for an actor ref not linked to a known PipelineStep...")
     }
   }
@@ -263,6 +280,18 @@ class PipelineInstance(filesgateConfiguration: FilesgateConfiguration, val pipel
   def freePipelineStepActors(pipelineStepFullName: String): List[ActorRef] = {
     val knownActorRefs: Map[ActorRef, Boolean] = pipelineSteps.values.filter(_.actorRef.isDefined).map(_.actorRef.get -> true).toMap
     Communication.actorRefsForId(pipelineStepFullName).filterNot(knownActorRefs.contains)
+  }
+
+  /**
+    * Set the necessary configuration to the pipelineGraph
+    */
+  def setPipelineGraphConfig(): Unit = {
+    pipelineGraph.setPipelineMetadata(pipelineMetadata)
+    pipelineGraph.setPipelineInstanceMetadata(pipelineInstanceMetadata)
+
+    pipelineSteps.values.groupBy(_.step).foreach(stepAndStatus => {
+      pipelineGraph.setPipelineStepStatuses(stepAndStatus._1, stepAndStatus._2.toList)
+    })
   }
 
   /**
