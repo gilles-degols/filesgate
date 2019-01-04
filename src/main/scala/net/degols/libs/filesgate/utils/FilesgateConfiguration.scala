@@ -36,9 +36,17 @@ import scala.util.Try
   */
 case class Step(tpe: String, name: String, loadBalancerType: LoadBalancerType, private val config: Config) {
   /**
-    * Maximum timeout for the step processing. This value is overrided by FilesgateConfiguration in any case.
+    * Maximum timeout for the step processing.
     */
-  var processingTimeout: Duration = 1000 millis
+  val processingTimeout: Duration = Try{config.getLong("timeout-ms")}.getOrElse(120*1000L) millis
+
+  /**
+    * Maximum number of messages in the buffer for this step. Be careful when setting this value with the processing
+    * timeout:
+    * If we have 50 parallel messages, and the step processes 1 message/1 second, and we have a processingTimeout
+    * of 20 seconds, we will have 30 messages with a timeout. So be careful with the mapAsync parallelism
+    */
+  val bufferSize: Int = Try{config.getInt("buffer-size")}.getOrElse(5)
 
   /**
     * Optional db service name to use for the step. It can be used for the Storage
@@ -202,7 +210,6 @@ class FilesgateConfiguration @Inject()(val defaultConfig: Config)(implicit val f
               }
 
               val step = Step(tpe, name, loadBalancerType, rawStep)
-              step.processingTimeout = Try{rawStep.getLong("timeout-step-ms") millis}.getOrElse(timeoutBetweenPipelineSteps)
 
               // Check to be sure that the user set the appropriate config
               if(step.dbServiceName.isEmpty && (step.tpe == Metadata.TYPE || step.tpe == Storage.TYPE || step.tpe == FailureHandling.TYPE)) {

@@ -396,7 +396,10 @@ class PipelineGraph(filesgateConfiguration: FilesgateConfiguration) {
       // timeout for the Ask pattern
       implicit val timeout: Timeout = Timeout(step.processingTimeout._1 millis)
 
-      Flow[PipelineStepMessageWrapper].mapAsync(50)(m => {
+      // Important note: The MapAsync parameters means that we can send x messages at the same time without waiting for any
+      // result directly. If we have 50 parallel messages, and the step processes 1 message/1 second, and we have a timeout
+      // of 20 seconds, we will have 30 messages with a timeout. So be careful with the mapAsync parallelism
+      Flow[PipelineStepMessageWrapper].mapAsync(step.bufferSize)(m => {
         m.failure match {
           case Some(failure) =>
             logger.debug(s"Pipeline graph step: message ${failure.initialMessage} is a previous failure, skip the crurent step")
@@ -408,6 +411,7 @@ class PipelineGraph(filesgateConfiguration: FilesgateConfiguration) {
             val pipelineStepStatus = preferredPipelineStepStatus(m, step).get
 
             logger.debug(s"Pipeline graph step: send message ${m} to $pipelineStepStatus")
+            implicit val sender = context.self
             m.addPipelineStepStatus(pipelineStepStatus)
             (pipelineStepStatus.actorRef.get ? m.originalMessage).withTimeout(timeout.duration._1 millis)
               .map(_.asInstanceOf[PipelineStepMessage]).transformWith{
