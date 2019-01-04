@@ -4,6 +4,7 @@ import akka.actor.{ActorContext, ActorRef}
 import net.degols.libs.cluster.balancing.BasicLoadBalancer
 import net.degols.libs.cluster.messages.Communication
 import net.degols.libs.filesgate.core._
+import net.degols.libs.filesgate.core.messagedistributor.{BasicMessageDistributor, MessageDistributor}
 import net.degols.libs.filesgate.utils._
 import org.slf4j.{Logger, LoggerFactory}
 
@@ -288,6 +289,22 @@ class PipelineInstance(filesgateConfiguration: FilesgateConfiguration, val pipel
   def setPipelineGraphConfig(): Unit = {
     pipelineGraph.setPipelineMetadata(pipelineMetadata)
     pipelineGraph.setPipelineInstanceMetadata(pipelineInstanceMetadata)
+
+    if(pipelineGraph.messageDistributor == null) {
+      val messageDistributor = pipelineMetadata.messageDistributor match {
+        case Some(packageName) =>
+          Try{Class.forName(s"$packageName").newInstance()} match {
+            case Success(res) => res.asInstanceOf[MessageDistributor]
+            case Failure(err) =>
+              err.printStackTrace()
+              throw new Exception(s"Invalid message distributor given for ${pipelineMetadata.id}: ${packageName}. No arguments should be provided. ")
+          }
+        case None => new BasicMessageDistributor()
+      }
+
+      pipelineGraph.setMessageDistributor(messageDistributor)
+    }
+
 
     pipelineSteps.values.groupBy(_.step).foreach(stepAndStatus => {
       pipelineGraph.setPipelineStepStatuses(stepAndStatus._1, stepAndStatus._2.toList)

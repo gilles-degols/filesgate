@@ -9,6 +9,7 @@ import akka.{Done, NotUsed}
 import net.degols.libs.cluster.messages.Communication
 import net.degols.libs.cluster.{Tools => ClusterTools}
 import net.degols.libs.filesgate.core.PipelineStepStatus
+import net.degols.libs.filesgate.core.messagedistributor.{BasicMessageDistributor, MessageDistributor}
 import net.degols.libs.filesgate.orm.FileMetadata
 import net.degols.libs.filesgate.pipeline.PipelineStepMessage
 import net.degols.libs.filesgate.pipeline.datasource.{DataSource, DataSourceSeed}
@@ -66,6 +67,19 @@ class PipelineGraph(filesgateConfiguration: FilesgateConfiguration) {
 
   def setPipelineInstanceMetadata(pipelineInstanceMetadata: PipelineInstanceMetadata): Unit = {
     this._pipelineInstanceMetadata = pipelineInstanceMetadata
+  }
+
+  private var _messageDistributor: MessageDistributor = _
+  def messageDistributor: MessageDistributor = _messageDistributor
+
+  /**
+    * Allow the developer to set a specific repartition method when a message can go to multiple actors for the next step.
+    * It might even set a message as failure if there is no good actor to process the message.
+    * Only one message distributor is allowed by Pipeline.
+    */
+  def setMessageDistributor(messageDistributor: MessageDistributor): Unit = {
+    _messageDistributor = messageDistributor
+    _messageDistributor.setPipelineGraph(this)
   }
 
   private var _steps: List[Step] = _
@@ -367,24 +381,21 @@ class PipelineGraph(filesgateConfiguration: FilesgateConfiguration) {
     }
     val stepStatuses = _pipelineStepStatuses(targetedStep)
 
-    if(downloadStatus.isDefined && (targetedStep.tpe == Download.TYPE || targetedStep.tpe == PreStorage.TYPE || targetedStep.tpe == Storage.TYPE)) {
+    val availableStepStatuses: List[PipelineStepStatus] = if(downloadStatus.isDefined && (targetedStep.tpe == Download.TYPE || targetedStep.tpe == PreStorage.TYPE || targetedStep.tpe == Storage.TYPE)) {
       // We target jvm with the same node as the one used for the download step
       val downloadNode = nodeFromActorRef(downloadStatus.get.actorRef.get)
-      val matchingStatuses = stepStatuses.filter(stepStatus => downloadNode == nodeFromActorRef(stepStatus.actorRef.get))
-      if (matchingStatuses.nonEmpty) {
-        Random.shuffle(matchingStatuses).headOption
-      } else {
-        None
-      }
+      stepStatuses.filter(stepStatus => downloadNode == nodeFromActorRef(stepStatus.actorRef.get))
     } else if(downloadStatus.isEmpty && targetedStep.tpe == Download.TYPE) {
       // We need to be sure that we have steps for the PreStorage and Storage
-      downloadWithColocation(targetedStep)
+      downloadStepStatusesWithCollocation(targetedStep)
     } else {
-      Random.shuffle(stepStatuses).headOption
+      stepStatuses
     }
+
+    _messageDistributor.bestPipelineStepStatus(message, targetedStep, availableStepStatuses)
   }
 
-  private def nodeFromActorRef(actorRef: ActorRef): String = actorRef.toString.split("//")(1).split("/").head.split(":").head
+  def nodeFromActorRef(actorRef: ActorRef): String = actorRef.toString.split("//")(1).split("/").head.split(":").head
 
 
   /**
@@ -422,9 +433,11 @@ class PipelineGraph(filesgateConfiguration: FilesgateConfiguration) {
                   res.abort match {
                     case Some(abortInfo) =>
                       val failure = FailureHandlingMessage.from(m.originalMessage, Some(res), None)
-                      PipelineStepMessageWrapper(m.originalMessage, Some(failure))
+                      m.failure = Some(failure)
+                      m
                     case None =>
-                      PipelineStepMessageWrapper(res, None)
+                      m.originalMessage = res
+                      m
                   }
                 }
               case Failure(err) =>
@@ -477,7 +490,7 @@ class PipelineGraph(filesgateConfiguration: FilesgateConfiguration) {
     // First we verify that we have colocated actors for the download / prestorage / storage steps
     val steps = stepWrappersFromType(Download.TYPE)
     val okForColocation: Boolean = if(steps.nonEmpty) {
-      downloadWithColocation(steps.head).isDefined
+      downloadStepStatusesWithCollocation(steps.head).nonEmpty
     } else {
       true
     }
@@ -490,15 +503,15 @@ class PipelineGraph(filesgateConfiguration: FilesgateConfiguration) {
     * step (so this needs to be efficient and avoid involving too much CPU/GC). But this is also used to detect if we can start a graph.
     * @return
     */
-  def downloadWithColocation(targetedStep: Step): Option[PipelineStepStatus] = {
+  def downloadStepStatusesWithCollocation(targetedStep: Step): List[PipelineStepStatus] = {
     val stepStatuses = _pipelineStepStatuses(targetedStep)
 
     val otherDownloadSteps = stepWrappersFromType(Download.TYPE).dropWhile(_ != targetedStep).filterNot(_ == targetedStep) // takes elements after the given step
     val preStorageSteps = stepWrappersFromType(PreStorage.TYPE)
     val storageSteps = stepWrappersFromType(Storage.TYPE)
 
-    // We need to find a valid download step, which means the one having "matching" prestorage/storage steps on the same jvm
-    val downloadStepStatus = Random.shuffle(stepStatuses).find(stepStatus => {
+    // We need to find valid download step, which means the one having "matching" prestorage/storage steps on the same jvm
+    val validDownloadStepStatuses = stepStatuses.filter(stepStatus => {
       val downloadNode = nodeFromActorRef(stepStatus.actorRef.get)
       // if we have PreStorage or Storage steps, we must be sure to have an actor for each of them on the same node
       val nodeStepStatuses = getStepStatuses(downloadNode)
@@ -508,10 +521,10 @@ class PipelineGraph(filesgateConfiguration: FilesgateConfiguration) {
       otherDownloadOnSameNode && preStorageOnSameNode && storageOnSameNode
     })
 
-    if(downloadStepStatus.isEmpty){
+    if(validDownloadStepStatuses.isEmpty){
       logger.error("We found no download step running on the same node as every pre-storage and storage step.")
     }
 
-    downloadStepStatus
+    validDownloadStepStatuses
   }
 }

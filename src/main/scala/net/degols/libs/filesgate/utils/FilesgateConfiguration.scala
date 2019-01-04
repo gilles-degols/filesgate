@@ -74,6 +74,9 @@ case class PipelineMetadata(id: String, pipelineInstancesMetadata: List[Pipeline
   // Max number of pipeline instances (this object is just one instance of them)
   val instances: Int = Try{config.getInt("pipeline-instance.quantity")}.getOrElse(1)
 
+  // Optional message distributor to use for this pipeline. We must provide a full package name, otherwise the default one (BasicMessageDistributor) will be used
+  val messageDistributor: Option[String] = Try{config.getString("message-distributor")}.toOption
+
   // Should we restart the pipeline if the stream finish successfully ?
   val restartWhenFinished: Boolean = Try{config.getBoolean("restart-when-finished")}.getOrElse(false)
 }
