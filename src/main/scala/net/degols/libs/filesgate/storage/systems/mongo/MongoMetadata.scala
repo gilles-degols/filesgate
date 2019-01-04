@@ -54,7 +54,7 @@ class MongoMetadata @Inject()(conf: FilesgateConfiguration, tools: Tools) extend
           )
         case None => // In this case, the only reason to be here is that we have an abort message
           val reschedule = failureHandlingMessage.outputMessage.get.abort.get.rescheduleSeconds match {
-            case Some(value) => Json.obj("reschedule_s" -> Json.obj("$numberLong" -> value))
+            case Some(value) => Json.obj("reschedule_s" -> value)
             case None => Json.obj()
           }
 

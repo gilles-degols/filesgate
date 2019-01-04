@@ -2,9 +2,11 @@ package net.degols.libs.filesgate.pipeline.failurehandling
 
 import net.degols.libs.filesgate.pipeline.{PipelineStep, PipelineStepMessage, PipelineStepService}
 import net.degols.libs.filesgate.storage.StorageMetadataApi
+import net.degols.libs.cluster.{Tools => ClusterTools}
 import org.slf4j.{Logger, LoggerFactory}
 
 import scala.concurrent.{ExecutionContext, Future}
+import scala.util.{Failure, Success}
 
 /**
   * Message wrapping any other PipelineStepMessage with abort=true and or exception
@@ -31,9 +33,13 @@ class FailureHandling(dbService: StorageMetadataApi)(implicit val ec: ExecutionC
   private val logger: Logger = LoggerFactory.getLogger(getClass)
 
   override def process(failureHandlingMessage: FailureHandlingMessage): Future[FailureHandlingMessage] = {
-    dbService.upsert(failureHandlingMessage).map(res => {
-      failureHandlingMessage
-    })
+    dbService.upsert(failureHandlingMessage).transformWith{
+      case Success(value) => Future{failureHandlingMessage}
+      case Failure(err) => Future{
+        logger.error(s"Problem while processing the failure handling: ${ClusterTools.formatStacktrace(err)}")
+        throw err
+      }
+    }
   }
 }
 

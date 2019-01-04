@@ -7,6 +7,7 @@ import net.degols.libs.filesgate.pipeline.prestorage.PreStorageMessage
 import net.degols.libs.filesgate.pipeline.{AbortStep, PipelineStep, PipelineStepMessage, PipelineStepService}
 import net.degols.libs.filesgate.storage.StorageContentApi
 import net.degols.libs.filesgate.utils.{DownloadedFile, DownloadedFileToDisk, DownloadedFileToMemory}
+import net.degols.libs.cluster.{Tools => ClusterTools}
 import org.slf4j.{Logger, LoggerFactory}
 import play.api.libs.json.JsObject
 
@@ -51,13 +52,17 @@ class Storage(dbService: StorageContentApi)(implicit val ec: ExecutionContext) e
   }
 
   override def process(storageMessage: StorageMessage): Future[StorageMessage] = {
-    val res = dbService.upsert(storageMessage.fileMetadata, storageMessage.downloadedFile.get).map(res => {
-      storageMessage
-    })
+    val res = dbService.upsert(storageMessage.fileMetadata, storageMessage.downloadedFile.get).transformWith{
+      case Success(value) => Future{storageMessage}
+      case Failure(err) => Future{
+        logger.error(s"Problem while storing a file: ${ClusterTools.formatStacktrace(err)}")
+        throw err
+      }
+    }
 
     res.onComplete {
-      case Success(res) => deleteDownloadFile(storageMessage)
-      case Failure(err) => deleteDownloadFile(storageMessage)
+      case Success(r) => deleteDownloadFile(storageMessage)
+      case Failure(e) => deleteDownloadFile(storageMessage)
     }
 
     res

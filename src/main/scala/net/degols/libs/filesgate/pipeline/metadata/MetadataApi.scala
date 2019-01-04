@@ -4,10 +4,12 @@ import net.degols.libs.filesgate.orm.FileMetadata
 import net.degols.libs.filesgate.pipeline.premetadata.PreMetadataMessage
 import net.degols.libs.filesgate.pipeline.{AbortStep, PipelineStep, PipelineStepMessage, PipelineStepService}
 import net.degols.libs.filesgate.storage.StorageMetadataApi
+import net.degols.libs.cluster.{Tools => ClusterTools}
 import org.slf4j.{Logger, LoggerFactory}
 import play.api.libs.json.JsObject
 
 import scala.concurrent.{ExecutionContext, Future}
+import scala.util.{Failure, Success}
 
 /**
   * Message sent through every MetadataApi
@@ -39,9 +41,13 @@ class Metadata(dbService: StorageMetadataApi)(implicit val ec: ExecutionContext)
   private val logger: Logger = LoggerFactory.getLogger(getClass)
 
   override def process(metadataMessage: MetadataMessage): Future[MetadataMessage] = {
-    dbService.upsert(metadataMessage.fileMetadata).map(res => {
-      metadataMessage
-    })
+    dbService.upsert(metadataMessage.fileMetadata).transformWith{
+      case Success(value) => Future{metadataMessage}
+      case Failure(err) => Future{
+        logger.error(s"Problem while processing the metadata: ${ClusterTools.formatStacktrace(err)}")
+        throw err
+      }
+    }
   }
 }
 
