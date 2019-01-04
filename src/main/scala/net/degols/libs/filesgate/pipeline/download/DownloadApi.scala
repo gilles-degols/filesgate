@@ -1,25 +1,15 @@
 package net.degols.libs.filesgate.pipeline.download
 
-import java.io.{File, FileWriter}
-import java.net.URL
-import java.nio.file.Path
-
-import akka.stream.scaladsl.Source
-import akka.util.ByteString
 import net.degols.libs.cluster.Tools
-import net.degols.libs.cluster.messages.{BasicLoadBalancerType, ClusterInstance, Communication}
-import net.degols.libs.filesgate.core.EngineLeader
-import net.degols.libs.filesgate.orm.{FileContent, FileMetadata}
+import net.degols.libs.filesgate.orm.FileMetadata
 import net.degols.libs.filesgate.pipeline.predownload.PreDownloadMessage
 import net.degols.libs.filesgate.pipeline.{AbortStep, PipelineStep, PipelineStepMessage, PipelineStepService}
-import net.degols.libs.filesgate.utils.{DownloadedFile, Step, Tools}
-import org.apache.commons.io.FileUtils
-import org.joda.time.DateTime
+import net.degols.libs.filesgate.utils.{DownloadedFile, Tools}
 import org.slf4j.{Logger, LoggerFactory}
 import play.api.libs.json.{JsObject, Json}
 
 import scala.concurrent.{ExecutionContext, Future}
-import scala.util.{Failure, Random, Success, Try}
+import scala.util.Random
 
 
 /**

@@ -2,13 +2,11 @@ package net.degols.libs.filesgate.pipeline.storage
 
 import java.io.File
 
-import net.degols.libs.cluster.messages.{BasicLoadBalancerType, ClusterInstance, Communication}
-import net.degols.libs.filesgate.core.EngineLeader
-import net.degols.libs.filesgate.orm.{FileContent, FileMetadata}
+import net.degols.libs.filesgate.orm.FileMetadata
 import net.degols.libs.filesgate.pipeline.prestorage.PreStorageMessage
 import net.degols.libs.filesgate.pipeline.{AbortStep, PipelineStep, PipelineStepMessage, PipelineStepService}
 import net.degols.libs.filesgate.storage.StorageContentApi
-import net.degols.libs.filesgate.utils.{DownloadedFile, DownloadedFileToDisk, DownloadedFileToMemory, Step}
+import net.degols.libs.filesgate.utils.{DownloadedFile, DownloadedFileToDisk, DownloadedFileToMemory}
 import org.slf4j.{Logger, LoggerFactory}
 import play.api.libs.json.JsObject
 

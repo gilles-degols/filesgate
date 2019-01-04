@@ -7,7 +7,8 @@ import akka.actor.ActorSystem
 import akka.stream.scaladsl.Source
 import akka.testkit.{ImplicitSender, TestActors, TestKit}
 import com.typesafe.config.{Config, ConfigFactory}
-import net.degols.libs.cluster.messages.{BasicLoadBalancerType, ClusterInstance}
+import net.degols.libs.cluster.messages.ClusterInstance
+import net.degols.libs.filesgate.core.loadbalancing.FilesgateBalancerType
 import net.degols.libs.filesgate.core.{PipelineStepRunning, PipelineStepStatus}
 import net.degols.libs.filesgate.orm.FileMetadata
 import net.degols.libs.filesgate.pipeline.datasource.DataSource
@@ -35,15 +36,15 @@ class PipelineGraphSpec extends TestKit(ActorSystem("MySpec")) with MockitoSugar
   // Default pipeline to work on. But, we might use another one depending on the use case
   var stepConfig = ConfigFactory.parseString("""""")
   var steps: List[Step] = List(
-    Step(DataSource.TYPE, "Component:Package:test.datasource", BasicLoadBalancerType(1, ClusterInstance), stepConfig),
-    Step(Matcher.TYPE, "Component:Package:test.matcher", BasicLoadBalancerType(1, ClusterInstance), stepConfig),
-    Step(PreDownload.TYPE, "Component:Package:test.predownload", BasicLoadBalancerType(1, ClusterInstance), stepConfig),
-    Step(Download.TYPE, "Component:Package:test.download", BasicLoadBalancerType(1, ClusterInstance), stepConfig),
-    Step(PreStorage.TYPE, "Component:Package:test.prestorage", BasicLoadBalancerType(1, ClusterInstance), stepConfig),
-    Step(Storage.TYPE, "Component:Package:test.storage", BasicLoadBalancerType(1, ClusterInstance), stepConfig),
-    Step(PreMetadata.TYPE, "Component:Package:test.premetadata", BasicLoadBalancerType(1, ClusterInstance), stepConfig),
-    Step(Metadata.TYPE, "Component:Package:test.metadata", BasicLoadBalancerType(1, ClusterInstance), stepConfig),
-    Step(PostMetadata.TYPE, "Component:Package:test.postmetadata", BasicLoadBalancerType(1, ClusterInstance), stepConfig)
+    Step(DataSource.TYPE, "Component:Package:test.datasource", FilesgateBalancerType(1, ClusterInstance), stepConfig),
+    Step(Matcher.TYPE, "Component:Package:test.matcher", FilesgateBalancerType(1, ClusterInstance), stepConfig),
+    Step(PreDownload.TYPE, "Component:Package:test.predownload", FilesgateBalancerType(1, ClusterInstance), stepConfig),
+    Step(Download.TYPE, "Component:Package:test.download", FilesgateBalancerType(1, ClusterInstance), stepConfig),
+    Step(PreStorage.TYPE, "Component:Package:test.prestorage", FilesgateBalancerType(1, ClusterInstance), stepConfig),
+    Step(Storage.TYPE, "Component:Package:test.storage", FilesgateBalancerType(1, ClusterInstance), stepConfig),
+    Step(PreMetadata.TYPE, "Component:Package:test.premetadata", FilesgateBalancerType(1, ClusterInstance), stepConfig),
+    Step(Metadata.TYPE, "Component:Package:test.metadata", FilesgateBalancerType(1, ClusterInstance), stepConfig),
+    Step(PostMetadata.TYPE, "Component:Package:test.postmetadata", FilesgateBalancerType(1, ClusterInstance), stepConfig)
   )
   var pipelineConfig = ConfigFactory.parseString("""""")
   val pipelineInstancesMetadata = List(PipelineInstanceMetadata(0, steps))

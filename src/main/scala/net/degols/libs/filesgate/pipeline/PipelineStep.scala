@@ -2,7 +2,6 @@ package net.degols.libs.filesgate.pipeline
 
 import net.degols.libs.filesgate.core.EngineInternalMessage
 import net.degols.libs.filesgate.orm.FileMetadata
-import net.degols.libs.filesgate.utils.Step
 
 trait PipelineStep {
   val TYPE: String = "Unknown"

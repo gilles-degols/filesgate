@@ -5,11 +5,13 @@ import java.util.concurrent.{ExecutorService, Executors}
 import akka.actor.{ActorContext, ActorRef, ActorSystem, Props}
 import javax.inject.{Inject, Singleton}
 import net.degols.libs.cluster.ClusterConfiguration
+import net.degols.libs.cluster.balancing.LoadBalancer
 import net.degols.libs.cluster.core.Cluster
 import net.degols.libs.cluster.manager.WorkerLeader
 import net.degols.libs.cluster.messages._
 import net.degols.libs.election.{ConfigurationService, ElectionService}
 import net.degols.libs.filesgate.core.engine.{Engine, EngineActor}
+import net.degols.libs.filesgate.core.loadbalancing.{FilesgateBalancer, FilesgateBalancerType}
 import net.degols.libs.filesgate.core.pipelineinstance.PipelineInstanceActor
 import net.degols.libs.filesgate.core.pipelinemanager.PipelineManagerActor
 import net.degols.libs.filesgate.pipeline.download.Download
@@ -21,6 +23,7 @@ import net.degols.libs.filesgate.storage.systems.mongo.{MongoContent, MongoMetad
 import net.degols.libs.filesgate.storage.{StorageContentApi, StorageMetadataApi}
 import net.degols.libs.filesgate.utils.{FilesgateConfiguration, PipelineMetadata, Step, Tools}
 import org.slf4j.LoggerFactory
+import play.api.libs.json.Json
 
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor}
 
@@ -45,6 +48,13 @@ abstract class EngineLeader @Inject()(engine: Engine,
   val threadPool: ExecutorService = Executors.newFixedThreadPool(20)
   implicit val ec: ExecutionContextExecutor =  ExecutionContext.fromExecutor(threadPool)
   private val logger = LoggerFactory.getLogger(getClass)
+
+  /**
+    * We need a specific balancer for filesgate
+    */
+  override protected val userLoadBalancers: List[LoadBalancer] = {
+    List(new FilesgateBalancer())
+  }
 
   /**
     * Start the default actors used internally by filegates. If the name does not exist, call the developer implementation
@@ -149,15 +159,15 @@ abstract class EngineLeader @Inject()(engine: Engine,
     // we should allow customization
     val totalPipelineInstances = filesgateConfiguration.pipelines.map(_.instances).sum
     val defaultWorkers = List(
-      WorkerTypeInfo(self, PipelineInstanceActor.NAME, BasicLoadBalancerType(instances = totalPipelineInstances, ClusterInstance))
+      WorkerTypeInfo(self, PipelineInstanceActor.NAME, FilesgateBalancerType(instances = totalPipelineInstances, ClusterInstance))
     )
 
 
     // The final list of workers to start
     List(
       // The Core-EngineActor + Core-PipelineManager can only be handled by Filesgate, and they are only linked to the current COMPONENT et PACKAGE
-      WorkerTypeInfo(self, EngineActor.name, BasicLoadBalancerType(instances = 1, ClusterInstance)),
-      WorkerTypeInfo(self, PipelineManagerActor.NAME, BasicLoadBalancerType(instances = totalPipelines, ClusterInstance))
+      WorkerTypeInfo(self, EngineActor.name, FilesgateBalancerType(instances = 1, ClusterInstance)),
+      WorkerTypeInfo(self, PipelineManagerActor.NAME, FilesgateBalancerType(instances = totalPipelines, ClusterInstance))
     ) ++ defaultWorkers ++ pipelineWorkerTypeInfo ++ allUserWorkerTypeInfo
   }
 
@@ -168,9 +178,14 @@ abstract class EngineLeader @Inject()(engine: Engine,
     filesgateConfiguration.pipelines.flatMap(pipelineMetadata => {
       pipelineMetadata.pipelineInstancesMetadata.flatMap(met => {
         met.steps.map(step => {
+          // Metadata necessary for the load balancer
+          val metadata = Json.obj(
+            "pipeline-step-type" -> step.tpe
+          )
+
           // The step name is formatted that way: "Component:Package:PipelineId.InstanceId.StepName" and we need to remove the two first parts to only have a proper local name
           val stepName: String = step.name.split(":", 3).drop(2).last
-          WorkerTypeInfo(self, s"$stepName", step.loadBalancerType)
+          WorkerTypeInfo(self, s"$stepName", step.loadBalancerType, metadata)
         })
       })
     })

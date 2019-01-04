@@ -5,9 +5,11 @@ import java.io.File
 import com.google.inject.Inject
 import com.typesafe.config.{Config, ConfigFactory, ConfigObject, ConfigValue}
 import javax.inject.Singleton
+import net.degols.libs.cluster.balancing.BasicLoadBalancerType
 import net.degols.libs.cluster.messages.{Communication, LoadBalancerType}
 import net.degols.libs.cluster.{Tools => ClusterTools}
 import net.degols.libs.filesgate.core.EngineLeader
+import net.degols.libs.filesgate.core.loadbalancing.FilesgateBalancerType
 import net.degols.libs.filesgate.pipeline.PipelineStep
 import net.degols.libs.filesgate.pipeline.datasource.DataSource
 import net.degols.libs.filesgate.pipeline.download.Download
@@ -192,8 +194,13 @@ class FilesgateConfiguration @Inject()(val defaultConfig: Config)(implicit val f
               }
 
               val name = Communication.fullActorName(EngineLeader.COMPONENT, EngineLeader.PACKAGE, rawNameWithPipeline)
+              val loadBalancerTypeName: String = LoadBalancerType.getLoadBalancerType(rawStep.getConfig("balancer")).getOrElse(FilesgateBalancerType.CONFIGURATION_KEY)
+              val loadBalancerType = loadBalancerTypeName match {
+                case BasicLoadBalancerType.CONFIGURATION_KEY => BasicLoadBalancerType.loadFromConfig(rawStep.getConfig("balancer"))
+                case FilesgateBalancerType.CONFIGURATION_KEY => FilesgateBalancerType.loadFromConfig(rawStep.getConfig("balancer"))
+                case x => throw new Exception("Unsupported balancer type.")
+              }
 
-              val loadBalancerType: LoadBalancerType = LoadBalancerType.loadFromConfig(rawStep.getConfig("balancer"))
               val step = Step(tpe, name, loadBalancerType, rawStep)
               step.processingTimeout = Try{rawStep.getLong("timeout-step-ms") millis}.getOrElse(timeoutBetweenPipelineSteps)
 
