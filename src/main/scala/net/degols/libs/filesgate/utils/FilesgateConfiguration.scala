@@ -185,51 +185,56 @@ class FilesgateConfiguration @Inject()(val defaultConfig: Config)(implicit val f
     }
 
     val set: List[(String, ConfigValue)] = config.getObject("filesgate.pipelines").asScala.toList
-    val res = set.map{
+    val res = set.flatMap{
       case (key, value) =>
         val id = key
         val currentPipeline: Config = value.asInstanceOf[ConfigObject].toConfig
+        val enabled = Try{currentPipeline.getBoolean("enabled")}.getOrElse(true)
         val quantity = Try{currentPipeline.getInt("pipeline-instance.quantity")}.getOrElse(1)
 
-        val instancesMetadata = (0 until quantity).map(instanceNumber => {
-          val steps: List[Step] = currentPipeline.getConfigList("steps").asScala.toList
-            .map(rawStep => {
-              val tpe = rawStep.getString("type")
-              val rawName = rawStep.getString("name")
-              // We might want to add the current Component/Package & the pipeline id in the step name
-              val rawNameWithPipeline: String = if(rawName.startsWith(id+".")) {
-                val n = rawName.split(".").drop(1)
-                s"$id.$instanceNumber.$n"
-              } else {
-                s"$id.$instanceNumber.$rawName"
-              }
+        if(!enabled) {
+          None
+        } else {
+          val instancesMetadata = (0 until quantity).map(instanceNumber => {
+            val steps: List[Step] = currentPipeline.getConfigList("steps").asScala.toList
+              .map(rawStep => {
+                val tpe = rawStep.getString("type")
+                val rawName = rawStep.getString("name")
+                // We might want to add the current Component/Package & the pipeline id in the step name
+                val rawNameWithPipeline: String = if(rawName.startsWith(id+".")) {
+                  val n = rawName.split(".").drop(1)
+                  s"$id.$instanceNumber.$n"
+                } else {
+                  s"$id.$instanceNumber.$rawName"
+                }
 
-              val name = Communication.fullActorName(EngineLeader.COMPONENT, EngineLeader.PACKAGE, rawNameWithPipeline)
-              val loadBalancerTypeName: String = LoadBalancerType.getLoadBalancerType(rawStep.getConfig("balancer")).getOrElse(FilesgateBalancerType.CONFIGURATION_KEY)
-              val loadBalancerType = loadBalancerTypeName match {
-                case BasicLoadBalancerType.CONFIGURATION_KEY => BasicLoadBalancerType.loadFromConfig(rawStep.getConfig("balancer"))
-                case FilesgateBalancerType.CONFIGURATION_KEY => FilesgateBalancerType.loadFromConfig(rawStep.getConfig("balancer"))
-                case x => throw new Exception("Unsupported balancer type.")
-              }
+                val name = Communication.fullActorName(EngineLeader.COMPONENT, EngineLeader.PACKAGE, rawNameWithPipeline)
+                val loadBalancerTypeName: String = LoadBalancerType.getLoadBalancerType(rawStep.getConfig("balancer")).getOrElse(FilesgateBalancerType.CONFIGURATION_KEY)
+                val loadBalancerType = loadBalancerTypeName match {
+                  case BasicLoadBalancerType.CONFIGURATION_KEY => BasicLoadBalancerType.loadFromConfig(rawStep.getConfig("balancer"))
+                  case FilesgateBalancerType.CONFIGURATION_KEY => FilesgateBalancerType.loadFromConfig(rawStep.getConfig("balancer"))
+                  case x => throw new Exception("Unsupported balancer type.")
+                }
 
-              val step = Step(tpe, name, loadBalancerType, rawStep)
+                val step = Step(tpe, name, loadBalancerType, rawStep)
 
-              // Check to be sure that the user set the appropriate config
-              if(step.dbServiceName.isEmpty && (step.tpe == Metadata.TYPE || step.tpe == Storage.TYPE || step.tpe == FailureHandling.TYPE)) {
-                throw new Exception(s"Missing db-service information for step $rawNameWithPipeline.")
-              }
+                // Check to be sure that the user set the appropriate config
+                if(step.dbServiceName.isEmpty && (step.tpe == Metadata.TYPE || step.tpe == Storage.TYPE || step.tpe == FailureHandling.TYPE)) {
+                  throw new Exception(s"Missing db-service information for step $rawNameWithPipeline.")
+                }
 
-              step
-            })
+                step
+              })
 
-          // We add missing pipeline steps between the one defined by the user, and order them correctly
-          val allSteps = completePipelineSteps(id, steps)
+            // We add missing pipeline steps between the one defined by the user, and order them correctly
+            val allSteps = completePipelineSteps(id, steps)
 
-          logger.info(s"PipelineStep '$id': $allSteps")
-          PipelineInstanceMetadata(instanceNumber, steps)
-        }).toList
+            logger.info(s"PipelineStep '$id': $allSteps")
+            PipelineInstanceMetadata(instanceNumber, steps)
+          }).toList
 
-        PipelineMetadata(id, instancesMetadata, currentPipeline)
+          Option(PipelineMetadata(id, instancesMetadata, currentPipeline))
+        }
     }
 
     res
