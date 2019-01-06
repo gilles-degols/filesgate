@@ -1,8 +1,11 @@
 package net.degols.libs.filesgate.pipeline.datasource
 
+import akka.NotUsed
+import akka.stream.scaladsl.Source
 import net.degols.libs.filesgate.orm.FileMetadata
 import net.degols.libs.filesgate.pipeline.{PipelineStep, PipelineStepService}
 import org.slf4j.{Logger, LoggerFactory}
+
 
 /**
   * There is not always a seed for the source, but having this message simplify the setup
@@ -12,15 +15,11 @@ case class DataSourceSeed()
 
 trait DataSourceApi extends PipelineStepService {
   def process(sourceSeed: DataSourceSeed): Iterator[FileMetadata]
+  def sourceProcess(sourceSeed: DataSourceSeed): Source[FileMetadata, Any] = Source.fromIterator(() => process(sourceSeed))
 
-  final override def process(message: Any): Any = process(message.asInstanceOf[DataSourceSeed])
+  final override def process(message: Any): Any = sourceProcess(message.asInstanceOf[DataSourceSeed])
 }
 
-class DataSource extends DataSourceApi {
-  private val logger: Logger = LoggerFactory.getLogger(getClass)
-
-  override def process(sourceSeed: DataSourceSeed): Iterator[FileMetadata] = ???
-}
 
 object DataSource extends PipelineStep {
   override val TYPE: String = "datasource"

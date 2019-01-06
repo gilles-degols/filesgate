@@ -127,7 +127,7 @@ class PipelineGraph(filesgateConfiguration: FilesgateConfiguration) {
     implicit val materializer = ActorMaterializer()
 
     // Various elements of the graph
-    val source: Source[FileMetadata, NotUsed] = loadSourceSteps()
+    val source: Source[FileMetadata, Any] = loadSourceSteps()
     val matcher = loadMatcherSteps()
     val preDownload = loadPreDownloadSteps()
     val download = loadDownloadSteps()
@@ -315,7 +315,7 @@ class PipelineGraph(filesgateConfiguration: FilesgateConfiguration) {
     * Load all sources and return a combination of them. If one is not received, fail.
     * @param stepWrappers
     */
-  private def loadSourceSteps(): Source[FileMetadata, NotUsed] = {
+  private def loadSourceSteps(): Source[FileMetadata, Any] = {
     // Ask for the Sources, then merge them together. See https://doc.akka.io/docs/akka/2.5/stream/operators/Source-or-Flow/merge.html
     // We could use a MergePrioritized for the priority queue
     // Note: For the source there is no load balancing available
@@ -326,7 +326,7 @@ class PipelineGraph(filesgateConfiguration: FilesgateConfiguration) {
       stepStatuses.head // We should always have one so it can fail
     })
 
-    val rawSources: List[Source[FileMetadata, NotUsed]] = sourceSteps.map(pipelineStepStatus => {
+    val rawSources: List[Source[FileMetadata, Any]] = sourceSteps.map(pipelineStepStatus => {
       loadSource(pipelineStepStatus) match {
         case None => throw new Exception(s"Source $pipelineStepStatus cannot be found")
         case Some(s) => s
@@ -336,7 +336,7 @@ class PipelineGraph(filesgateConfiguration: FilesgateConfiguration) {
     // Multiplying everything by 100, as it seems the priority is used to create a buffer: https://github.com/akka/akka/issues/25823
     val priorityList: List[Int] = sourceSteps.map(_.step.priority*100)
 
-    val mergedSources: Source[FileMetadata, NotUsed] = if(rawSources.size == 1) rawSources.head
+    val mergedSources: Source[FileMetadata, Any] = if(rawSources.size == 1) rawSources.head
     else if(rawSources.size == 2) Source.combine(rawSources.head, rawSources(1))(numInputs => MergePrioritized(priorityList))
     else Source.combine(rawSources.head, rawSources(1), rawSources:_*)(numInputs => MergePrioritized(priorityList))
 
@@ -348,12 +348,12 @@ class PipelineGraph(filesgateConfiguration: FilesgateConfiguration) {
     * @param pipelineStepStatus
     * @return
     */
-  def loadSource(pipelineStepStatus: PipelineStepStatus): Option[Source[FileMetadata, NotUsed]] = {
+  def loadSource(pipelineStepStatus: PipelineStepStatus): Option[Source[FileMetadata, Any]] = {
     logger.debug("Send a message to get a source")
     Communication.sendWithReply(context.self, pipelineStepStatus.actorRef.get, DataSourceSeed()) match {
       case Success(res) =>
         logger.debug(s"Got a source: $res")
-        Option(res.content.asInstanceOf[Source[FileMetadata, NotUsed]])
+        Option(res.content.asInstanceOf[Source[FileMetadata, Any]])
       case Failure(err) =>
         logger.error(s"Problem to get the Source: $err")
         None

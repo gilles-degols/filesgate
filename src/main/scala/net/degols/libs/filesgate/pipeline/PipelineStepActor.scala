@@ -29,8 +29,7 @@ class PipelineStepActor(implicit val ec: ExecutionContext, pipelineStepService: 
     case message: DataSourceSeed => // Return the Source directly, not a message
       pipelineStepService match {
         case sourceApi: DataSourceApi =>
-          val iter: Iterator[FileMetadata] = sourceApi.process(message)
-          val source: Source[FileMetadata, NotUsed] = Source.fromIterator(() => iter)
+          val source: Source[FileMetadata, Any] = sourceApi.sourceProcess(message)
           sender() ! source
         case _ =>
           logger.warn(s"$id: Received a SourceSeed even though we do not have a SourceApi...: ${message}")

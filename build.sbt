@@ -28,6 +28,11 @@ libraryDependencies += "commons-io" % "commons-io" % "2.4"
 
 libraryDependencies += "com.typesafe.play" %% "play-ws" % playVersion
 
+// Kafka
+lazy val kafkaVersion = "2.1.0"
+libraryDependencies += "javax.ws.rs" % "javax.ws.rs-api" % "2.1.1" artifacts( Artifact("javax.ws.rs-api", "jar", "jar"))
+libraryDependencies += "org.apache.kafka" %% "kafka-streams-scala" % kafkaVersion
+
 
 // Cluster library
 val clusterLibraryVersion = "0.0.1"
